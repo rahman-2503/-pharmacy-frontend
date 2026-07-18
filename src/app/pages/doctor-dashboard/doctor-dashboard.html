@@ -1,0 +1,317 @@
+<div class="dashboard-layout container">
+  <!-- Sidebar Panel -->
+  <aside class="sidebar-panel">
+    <div class="sidebar-profile">
+      <div class="profile-avatar">D</div>
+      <div class="profile-name">{{ doctorUser?.name }}</div>
+      <div class="profile-role">Clinic Sync Active</div>
+      <span class="badge badge-success" style="margin-top: 8px;">Verified Session</span>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <ul class="sidebar-nav-list">
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'dashboard'" (click)="setSection('dashboard')">
+            📊 Overview Stats
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'order-drugs'" (click)="setSection('order-drugs')">
+            🛒 Place Drug Orders
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'order-history'" (click)="setSection('order-history')">
+            📜 Order History Logs
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'view-drugs'" (click)="setSection('view-drugs')">
+            💊 View Drugs
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content Panel -->
+  <main class="main-content-panel">
+    <!-- SECTION 0: OVERVIEW STATS -->
+    <div class="section-card" *ngIf="currentSection === 'dashboard'">
+      <div class="section-hdr">Welcome back, Dr. {{ doctorUser?.name }}</div>
+      <div class="tab-content">
+        <!-- Quick Stats Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-card item-teal">
+            <h3>{{ totalOrdersCount }}</h3>
+            <p>Orders Placed</p>
+          </div>
+          <div class="metric-card item-blue">
+            <h3>₹{{ totalSpent }}</h3>
+            <p>Total Spent</p>
+          </div>
+          <div class="metric-card item-orange">
+            <h3>₹{{ pendingPaymentsTotal }}</h3>
+            <p>Pending Payments</p>
+          </div>
+        </div>
+
+        <!-- Charts Layout (Doughnut & Bar Spend Chart) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; flex-wrap: wrap;">
+          <div class="chart-box" style="height: 350px;">
+            <h4>Your Order Status Summary</h4>
+            <div style="position: relative; height: 260px;">
+              <canvas id="doctorOrdersChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-box" style="height: 350px;">
+            <h4>Spending per Medicine Catalog</h4>
+            <div style="position: relative; height: 260px;">
+              <canvas id="doctorSpendChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Notifications Broadcast System -->
+        <div class="chart-box" style="padding: 20px;">
+          <h4 style="margin-bottom: 12px;">🔔 Live Alerts</h4>
+          <div *ngIf="notifications.length > 0; else noNotifsTpl" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto;">
+            <div *ngFor="let notif of notifications" style="background-color: #fff; padding: 12px 16px; border-radius: var(--radius-sm); border-left: 4px solid var(--secondary-color); box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; gap: 10px; align-items: flex-start;">
+                <span style="font-size: 18px;">{{ notif.type === 'DRUG' ? '💊' : notif.type === 'PAYMENT' ? '💳' : notif.type === 'ORDER' ? '📦' : '📢' }}</span>
+                <div>
+                  <p style="font-size: 14px; font-weight: 600; color: var(--text-dark); margin: 0;">{{ notif.message }}</p>
+                  <span style="font-size: 11px; color: var(--text-muted);">{{ notif.timestamp | date:'MMM d, h:mm a' }}</span>
+                </div>
+              </div>
+              <span class="badge" [ngClass]="{
+                'badge-success': notif.type === 'DRUG',
+                'badge-info': notif.type === 'ORDER',
+                'badge-warning': notif.type === 'PAYMENT'
+              }" style="font-size: 10px; flex-shrink: 0;">{{ notif.type || 'SYSTEM' }}</span>
+            </div>
+          </div>
+          <ng-template #noNotifsTpl>
+            <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px;">
+              No alerts or notifications yet.
+            </div>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 1: PLACE DRUG ORDERS (CAROUSEL & DRAWER CART) -->
+    <div style="display: flex; flex-direction: column; gap: 24px;" *ngIf="currentSection === 'order-drugs'">
+      <!-- Catalog Header & Search & Cart Toggle -->
+      <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 16px 24px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); flex-wrap: wrap; gap: 16px;">
+        <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: var(--dark-bg); flex-shrink: 0;">Medicine Inventory</h2>
+        
+        <div style="display: flex; gap: 10px; align-items: center; flex: 1; max-width: 500px;">
+          <input 
+            type="text" 
+            [(ngModel)]="searchQuery" 
+            placeholder="Type name to search medicine..."
+            (keyup.enter)="onSearch()"
+            style="flex: 1;">
+          <button (click)="onSearch()" class="btn btn-secondary" style="padding: 10px 20px;">Search</button>
+        </div>
+
+        <button (click)="showCartDrawer = true" class="btn btn-primary" style="position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 20px;">
+          <span>🛒</span>
+          <span style="font-weight: 700;">Cart Queue</span>
+          <span *ngIf="cart.length > 0" style="position: absolute; top: -10px; right: -10px; background-color: var(--danger-color); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 11px; display: flex; align-items: center; justify-content: center; font-weight: 800; border: 2px solid white; box-shadow: var(--shadow-sm);">
+            {{ cart.length }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Drug Carousel (Full Width) -->
+      <div class="section-card">
+        <div class="section-hdr">Catalog Drugs</div>
+        <div class="tab-content" style="position: relative; overflow: hidden; padding: 24px 8px;">
+          <div class="carousel-container" *ngIf="filteredDrugs.length > 0; else noDrugsTpl" style="display: flex; align-items: center;">
+            <button class="carousel-arrow left-arrow" (click)="scrollCarousel(-1)" style="border: none; background: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; box-shadow: var(--shadow-sm); z-index: 10;">&lsaquo;</button>
+            
+            <div class="carousel-track" #carousel style="display: flex; gap: 20px; overflow-x: auto; scroll-behavior: smooth; padding: 10px; width: 100%; scrollbar-width: none;">
+              <div class="drug-card" *ngFor="let drug of filteredDrugs" style="flex: 0 0 280px; background: white; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-sm); position: relative;">
+                <div style="width: 100%; height: 180px; border-radius: var(--radius-sm); overflow: hidden; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); box-shadow: inset 0 0 10px rgba(0,0,0,0.02);">
+                  <img [src]="drug.photoUrl" alt="{{ drug.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+                <h4 style="font-size: 16px; margin-bottom: 2px; font-weight: 700;">{{ drug.name }}</h4>
+                <p style="font-size: 13px; font-weight: 700; color: var(--primary-color);">Price: ₹{{ drug.price }}</p>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+                  <label style="font-weight: 600;">Qty:</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    [max]="drug.stock" 
+                    [(ngModel)]="quantitiesMap[drug.id! || drug.drugId!]"
+                    style="width: 70px; padding: 4px 8px; font-size: 13px;">
+                </div>
+                
+                <button class="btn btn-outline btn-add-bill btn-sm" (click)="addToCart(drug)" style="width: 100%; font-size: 13px;">Add to Bill</button>
+                <span style="font-size: 10px; color: var(--text-muted); position: absolute; top: 12px; right: 12px; background: rgba(241, 245, 249, 0.9); padding: 2px 6px; border-radius: 4px; font-weight: 600;">Stock: {{ drug.stock }}</span>
+              </div>
+            </div>
+            
+            <button class="carousel-arrow right-arrow" (click)="scrollCarousel(1)" style="border: none; background: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; box-shadow: var(--shadow-sm); z-index: 10;">&rsaquo;</button>
+          </div>
+          <ng-template #noDrugsTpl>
+            <div style="text-align: center; padding: 30px; color: var(--text-muted);">No drugs found matching "{{ searchQuery }}"</div>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: ORDER HISTORY -->
+    <div class="section-card" *ngIf="currentSection === 'order-history'">
+      <div class="section-hdr">Your Order Transaction History</div>
+      <div class="tab-content">
+        <div class="table-responsive" *ngIf="orders.length > 0; else noOrdersTpl">
+          <table class="pharmacare-table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Pickup Date</th>
+                <th>Drug Details</th>
+                <th>Total Cost</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let order of orders">
+                <td><code>{{ order.id || order.orderId }}</code></td>
+                <td>{{ order.pickupDate ? order.pickupDate : 'Pending Audit' }}</td>
+                <td>
+                  <div class="order-drug-list">
+                    <span *ngFor="let name of order.drugNames || []; let idx = index" class="order-drug-tag">
+                      {{ name }} (x{{ order.quantities?.[idx] || 1 }})
+                    </span>
+                  </div>
+                </td>
+                <td>₹{{ order.total }}</td>
+                 <td>
+                  <span class="badge" [ngClass]="{
+                    'badge-warning': order.status === 'PENDING',
+                    'badge-info': order.status === 'PLACED',
+                    'badge-success': order.status === 'VERIFIED' || order.status === 'PICKED',
+                    'badge-danger': order.status === 'FAILED'
+                  }">{{ order.status }}</span>
+                </td>
+                <td>
+                  <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
+                    <button 
+                      *ngIf="order.status === 'PENDING'; else verifiedPaidTpl" 
+                      class="btn btn-secondary btn-sm pay-btn" 
+                      (click)="openPaymentModal(order)">
+                      Pay Now
+                    </button>
+                    <ng-template #verifiedPaidTpl>
+                      <span *ngIf="order.status === 'PLACED'" class="badge badge-info">Awaiting Admin Audit</span>
+                      <div *ngIf="order.status === 'VERIFIED'" style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
+                        <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: var(--success-color);">Verified (Ready)</span>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-dark);">Pickup: {{ order.pickupDate }}</span>
+                      </div>
+                      <span *ngIf="order.status === 'PICKED'" class="badge badge-success">Picked Up & Completed</span>
+                    </ng-template>
+                    <button class="btn btn-outline btn-sm print-invoice-btn" (click)="printInvoice(order)">
+                      🖨️ Print Invoice
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <ng-template #noOrdersTpl>
+          <div style="text-align: center; padding: 40px; color: var(--text-muted);">You have not placed any orders yet.</div>
+        </ng-template>
+      </div>
+    </div>
+
+    <!-- SECTION 3: VIEW DRUGS -->
+    <div class="section-card" *ngIf="currentSection === 'view-drugs'">
+      <div class="section-hdr">Drug Catalogue</div>
+      <div class="tab-content" style="padding: 24px;">
+        <div class="drugs-grid" *ngIf="drugs.length > 0; else noDrugsListTpl">
+          <div class="drug-view-card" *ngFor="let drug of drugs">
+            <div class="drug-view-image">
+              <img [src]="drug.photoUrl" [alt]="drug.name">
+            </div>
+            <div class="drug-view-body">
+              <h3>{{ drug.name }}</h3>
+              <span class="drug-view-category" *ngIf="drug.category">{{ drug.category }}</span>
+              <p class="drug-view-desc">{{ drug.description || 'No description available.' }}</p>
+              <div class="drug-view-meta">
+                <div class="drug-view-price">₹{{ drug.price }}</div>
+                <div class="drug-view-stock" [class.low-stock]="drug.stock < 10">
+                  Stock: {{ drug.stock }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ng-template #noDrugsListTpl>
+          <div style="text-align: center; padding: 40px; color: var(--text-muted);">No drugs available in the catalogue.</div>
+        </ng-template>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Slide-out Cart Drawer -->
+<div class="cart-drawer-backdrop" *ngIf="showCartDrawer" (click)="showCartDrawer = false"></div>
+<div class="cart-drawer" [class.open]="showCartDrawer">
+  <div class="drawer-header">
+    <h3>🛒 Billing Cart Queue</h3>
+    <button class="close-drawer-btn" (click)="showCartDrawer = false">&times;</button>
+  </div>
+  
+  <div class="drawer-body">
+    <div class="cart-content" *ngIf="cart.length > 0; else emptyCartTpl">
+      <div style="flex: 1; overflow-y: auto;">
+        <table class="cart-table" style="width: 100%; border-collapse: collapse; font-size: 14px; text-align: left;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 700;">
+              <th style="padding: 12px 8px;">Drug</th>
+              <th style="padding: 12px 8px; text-align: center;">Qty</th>
+              <th style="padding: 12px 8px; text-align: right;">Cost</th>
+              <th style="padding: 12px 8px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of cart; let i = index" style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 12px 8px;"><strong>{{ item.drug.name }}</strong></td>
+              <td style="padding: 12px 8px; text-align: center;">{{ item.quantity }}</td>
+              <td style="padding: 12px 8px; text-align: right;">₹{{ item.drug.price * item.quantity }}</td>
+              <td style="padding: 12px 8px; text-align: right;">
+                <button (click)="removeFromCart(i)" style="background: none; border: none; color: var(--danger-color); font-size: 20px; cursor: pointer; font-weight: 700; padding: 4px;">&times;</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="drawer-footer">
+        <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; margin-bottom: 20px; padding-top: 16px; border-top: 2px solid var(--border-color);">
+          <span>Grand Total:</span>
+          <span style="color: var(--primary-color);">₹{{ cartTotal }}</span>
+        </div>
+        <button class="btn btn-primary btn-block btn-lg" (click)="placeOrder()" style="width: 100%; padding: 14px 20px; font-size: 16px;">
+          Checkout & Pay (Razorpay)
+        </button>
+      </div>
+    </div>
+
+    <ng-template #emptyCartTpl>
+      <div style="text-align: center; padding: 80px 20px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+        <span style="font-size: 60px; display: block; margin-bottom: 20px;">🛒</span>
+        <p style="font-size: 15px; font-weight: 600; color: var(--text-muted);">Your billing queue is empty.</p>
+        <p style="font-size: 13px; margin-top: 8px;">Add drugs from the catalog list to start building an order.</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

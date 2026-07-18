@@ -1,0 +1,58 @@
+<div class="pricing-page">
+  <section class="page-header wavy-banner-container">
+    <div class="container header-content">
+      <h1>Subscription Plans</h1>
+      <p>Flexible packages designed to support retail, clinics, and multi-location pharmacy chains.</p>
+    </div>
+    <div class="wavy-divider">
+      <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <path d="M985.66,92.83C906.67,72,823.78,31,743.84,14.19c-82.26-17.34-168.06-16.33-250.45.39-57.84,11.73-114,31.07-172,41.86A600.21,600.21,0,0,1,0,27.35V120H1200V95.8C1130.5,123.6,1048.2,109.3,985.66,92.83Z" class="shape-fill"></path>
+      </svg>
+    </div>
+  </section>
+
+  <section class="section-padding container">
+    <div class="grid grid-4">
+      <div class="pricing-card" [ngClass]="{'recommended-card': plan.recommended}" *ngFor="let plan of plans">
+        <span class="reco-badge" *ngIf="plan.recommended">RECOMMENDED</span>
+        <h3>{{ plan.name }}</h3>
+        <p class="price-desc">{{ plan.desc }}</p>
+        <div class="price-val">
+          <span class="amt">{{ plan.price }}</span>
+          <span class="term">/{{ plan.term }}</span>
+        </div>
+        <ul class="plan-features">
+          <li *ngFor="let f of plan.features">✓ {{ f }}</li>
+        </ul>
+        <a routerLink="/login" [queryParams]="{ role: 'doctor' }" class="btn" [ngClass]="plan.recommended ? 'btn-primary' : 'btn-outline'">Get Started</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section on Pricing -->
+  <section class="section-padding bg-white">
+    <div class="container">
+      <h2 class="section-title">Pricing Frequently Asked Questions</h2>
+      <p class="section-subtitle">Got questions about subscription renewals or custom integrations? We have answers.</p>
+
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h4>Can I change my plan later?</h4>
+          <p>Yes, you can upgrade or downgrade your plan at any time. When upgrading, your payment will be prorated based on the remaining days of your current cycle.</p>
+        </div>
+        <div class="faq-item">
+          <h4>Are there any setup fees?</h4>
+          <p>No, there are no hidden setup fees. All standard onboarding training, data imports, and initial supplier configurations are included in the annual fee.</p>
+        </div>
+        <div class="faq-item">
+          <h4>Do you offer monthly cycles?</h4>
+          <p>To reduce administrative billing overhead and offer the lowest prices possible, our standard plans are billed annually. Custom monthly options are available for Capsule/Injection packages upon request.</p>
+        </div>
+        <div class="faq-item">
+          <h4>Is my database backed up securely?</h4>
+          <p>Absolutely. All databases are securely hosted on AWS with automatic point-in-time recovery and database mirroring, fully compliant with FHIR regulations.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,65 @@
+<div class="learn-page">
+  <section class="page-header wavy-banner-container">
+    <div class="container header-content">
+      <h1>eMpact & Learning Center</h1>
+      <p>Explore success stories from pharmacies using eVital, and watch step-by-step training guides.</p>
+    </div>
+    <div class="wavy-divider">
+      <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <path d="M985.66,92.83C906.67,72,823.78,31,743.84,14.19c-82.26-17.34-168.06-16.33-250.45.39-57.84,11.73-114,31.07-172,41.86A600.21,600.21,0,0,1,0,27.35V120H1200V95.8C1130.5,123.6,1048.2,109.3,985.66,92.83Z" class="shape-fill"></path>
+      </svg>
+    </div>
+  </section>
+
+  <!-- Case Studies Details -->
+  <section class="section-padding container">
+    <h2 class="section-title">Case Studies & Success Stories</h2>
+    <p class="section-subtitle">Read how local pharmacies upgraded their workflows and achieved substantial business growth.</p>
+
+    <div class="case-studies-grid">
+      <div class="detail-case-card" *ngFor="let cs of caseStudies">
+        <div class="detail-case-header">
+          <h3>{{ cs.title }}</h3>
+          <span class="loc-text">📍 {{ cs.location }}</span>
+        </div>
+        <div class="detail-case-body">
+          <div class="column">
+            <h4>Challenge</h4>
+            <p>{{ cs.challenge }}</p>
+          </div>
+          <div class="column">
+            <h4>Solution</h4>
+            <p>{{ cs.solution }}</p>
+          </div>
+          <div class="column results-column">
+            <h4>Key Outcomes</h4>
+            <ul>
+              <li *ngFor="let res of cs.results">✓ {{ res }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Video Training Section -->
+  <section class="section-padding bg-white">
+    <div class="container">
+      <h2 class="section-title">Training Videos & Tutorials</h2>
+      <p class="section-subtitle">Get started with step-by-step videos demonstrating typical daily workflows.</p>
+
+      <div class="grid grid-3">
+        <div class="video-card" *ngFor="let vid of videos">
+          <div class="video-thumbnail">
+            <span class="play-icon">▶</span>
+            <span class="duration-badge">{{ vid.duration }}</span>
+          </div>
+          <div class="video-content">
+            <h3>{{ vid.title }}</h3>
+            <p>{{ vid.desc }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,583 @@
+.dashboard-container {
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.welcome-banner {
+  background: white;
+  border: 1px solid var(--border-color);
+  padding: 24px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.welcome-banner h2 {
+  font-size: 26px;
+  color: var(--dark-bg);
+}
+
+.doctor-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Grid layout */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel-section {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.section-hdr {
+  background-color: #f1f5f9;
+  padding: 16px 24px;
+  font-weight: 700;
+  color: var(--dark-bg);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 16px;
+}
+
+/* Search bar styling */
+.search-drugs-section {
+  margin-bottom: 24px;
+}
+
+.search-bar-wrapper {
+  padding: 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.search-btn {
+  padding: 12px 24px;
+  background-color: #06b6d4; /* Teal */
+  color: white;
+}
+.search-btn:hover {
+  background-color: #0891b2;
+}
+
+/* Drug Carousel (Matches Screenshot Page 4) */
+.carousel-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.carousel-track {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 10px 4px 20px 4px;
+  width: 100%;
+}
+.carousel-track::-webkit-scrollbar {
+  display: none; /* Hide scrollbars */
+}
+
+.carousel-arrow {
+  background-color: white;
+  border: 1px solid var(--border-color);
+  color: #06b6d4;
+  font-size: 32px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.carousel-arrow:hover {
+  background-color: #06b6d4;
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Drug Cards */
+.drug-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 24px;
+  width: 250px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  text-align: center;
+}
+
+.drug-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: #06b6d4;
+}
+
+.drug-name {
+  font-size: 18px;
+  color: var(--dark-bg);
+  font-weight: 700;
+}
+
+.card-divider {
+  height: 1px;
+  background-color: #f1f5f9;
+}
+
+.drug-price {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.qty-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.qty-input {
+  width: 70px;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.btn-add-bill {
+  border-color: #06b6d4;
+  color: #06b6d4;
+  padding: 8px;
+  font-size: 13px;
+  margin-top: 4px;
+}
+.btn-add-bill:hover {
+  background-color: #06b6d4;
+  color: white;
+}
+
+.stock-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Cart Panel styling */
+.cart-section {
+  min-height: 300px;
+}
+
+.cart-content {
+  padding: 20px;
+}
+
+.cart-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.cart-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.cart-table td {
+  padding: 12px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.remove-btn {
+  background: transparent;
+  border: none;
+  color: var(--danger-color);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.cart-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dark-bg);
+}
+
+.grand-total {
+  color: var(--primary-color);
+  font-size: 18px;
+}
+
+.empty-cart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.empty-cart .cart-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+/* History Section */
+.history-section {
+  margin-top: 10px;
+}
+
+.order-drug-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.order-drug-tag {
+  background-color: #f1f5f9;
+  color: var(--text-dark);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.no-data-msg {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.print-invoice-btn {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  white-space: nowrap;
+}
+.print-invoice-btn:hover {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+/* View Drugs Grid */
+.drugs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.drug-view-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+}
+
+.drug-view-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+}
+
+.drug-view-image {
+  width: 100%;
+  height: 200px;
+  background-color: #f1f5f9;
+  overflow: hidden;
+}
+
+.drug-view-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.drug-view-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.drug-view-body h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--dark-bg);
+}
+
+.drug-view-category {
+  display: inline-block;
+  background-color: rgba(13, 148, 136, 0.1);
+  color: var(--primary-color);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  align-self: flex-start;
+}
+
+.drug-view-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.drug-view-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.drug-view-price {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--primary-color);
+}
+
+.drug-view-stock {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.drug-view-stock.low-stock {
+  color: var(--danger-color);
+  font-weight: 700;
+}
+
+/* Modal Backdrops */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal-card {
+  background-color: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 450px;
+  overflow: hidden;
+}
+
+.modal-header {
+  background-color: #f1f5f9;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.close-modal-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.modal-summary-row.highlight {
+  border-top: 1px dashed var(--border-color);
+  padding-top: 12px;
+  color: var(--dark-bg);
+  font-size: 16px;
+}
+
+.modal-input-grp {
+  margin-top: 10px;
+}
+
+.modal-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.modal-success-screen {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.success-check {
+  font-size: 40px;
+  color: var(--success-color);
+  background-color: rgba(16, 185, 129, 0.1);
+  width: 70px;
+  height: 70px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-bottom: 12px;
+}
+
+/* --- PREMIUM CART DRAWER STYLE --- */
+.cart-drawer-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1900;
+  animation: fadeIn 0.3s ease;
+}
+
+.cart-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100%;
+  max-width: 480px;
+  height: 100vh;
+  background-color: white;
+  box-shadow: -10px 0 30px rgba(15, 23, 42, 0.15);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cart-drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  padding: 24px;
+  background-color: #f8fafc;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.drawer-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--dark-bg);
+}
+
+.close-drawer-btn {
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: 0 4px;
+  transition: var(--transition);
+}
+
+.close-drawer-btn:hover {
+  color: var(--danger-color);
+}
+
+.drawer-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drawer-body .cart-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.drawer-footer {
+  padding-top: 16px;
+  margin-top: auto;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

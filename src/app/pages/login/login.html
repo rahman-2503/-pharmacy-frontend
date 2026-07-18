@@ -1,0 +1,131 @@
+<div class="login-page-container">
+  <!-- Wavy Header Banner -->
+  <div class="login-banner wavy-banner-container">
+    <div class="container banner-inner">
+      <h2>Welcome to pharmacare</h2>
+      <p>Secure portal access for authorized doctor clinics and store administrators.</p>
+    </div>
+    <div class="wavy-divider">
+      <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <path d="M985.66,92.83C906.67,72,823.78,31,743.84,14.19c-82.26-17.34-168.06-16.33-250.45.39-57.84,11.73-114,31.07-172,41.86A600.21,600.21,0,0,1,0,27.35V120H1200V95.8C1130.5,123.6,1048.2,109.3,985.66,92.83Z" class="shape-fill"></path>
+      </svg>
+    </div>
+  </div>
+
+  <div class="container login-grid">
+    <!-- Login Card (Left Side) -->
+    <div class="card login-card" *ngIf="activeTab === 'login'">
+      <div class="card-header">
+        <h3>Login</h3>
+        <div class="role-selector">
+          <button type="button" [class.active]="loginRole === 'doctor'" (click)="setLoginRole('doctor')">Doctor</button>
+          <button type="button" [class.active]="loginRole === 'admin'" (click)="setLoginRole('admin')">Admin</button>
+        </div>
+      </div>
+      
+      <form (ngSubmit)="onLogin()" #loginForm="ngForm">
+        <div class="form-group">
+          <input 
+            type="email" 
+            name="loginEmail" 
+            [(ngModel)]="loginData.email" 
+            required 
+            placeholder="Your Email"
+            (blur)="validateEmail(loginData.email)"
+            [class.input-error]="emailValidationError">
+          <span class="error-msg" *ngIf="emailValidationError">{{ emailValidationError }}</span>
+        </div>
+
+        <div class="form-group">
+          <input 
+            type="password" 
+            name="loginPassword" 
+            [(ngModel)]="loginData.password" 
+            required 
+            placeholder="Your Password">
+        </div>
+
+        <div class="form-options">
+          <label class="checkbox-container">
+            <input type="checkbox" name="rememberMe" [(ngModel)]="loginData.rememberMe">
+            <span class="checkmark"></span>
+            Remember me
+          </label>
+        </div>
+
+        <span class="error-msg center-error" *ngIf="loginError">{{ loginError }}</span>
+
+        <button type="submit" class="btn btn-primary btn-block" [disabled]="!loginForm.form.valid">Login</button>
+      </form>
+
+      <div class="card-footer">
+        <span class="brand-text"><span class="brand-pharm">pharma</span><span class="brand-care">care</span></span>
+        <a (click)="setTab('signup')" class="switch-link">Sign Up</a>
+      </div>
+    </div>
+
+    <!-- Signup Card (Right Side) -->
+    <div class="card signup-card" *ngIf="activeTab === 'signup'">
+      <div class="card-header">
+        <h3>Signup</h3>
+        <span class="role-badge">Doctor Account</span>
+      </div>
+
+      <form (ngSubmit)="onSignup()" #signupForm="ngForm">
+        <div class="form-group">
+          <input 
+            type="text" 
+            name="signupName" 
+            [(ngModel)]="signupData.name" 
+            required 
+            placeholder="Your Name">
+        </div>
+
+        <div class="form-group">
+          <input 
+            type="tel" 
+            name="signupContact" 
+            [(ngModel)]="signupData.contact" 
+            required 
+            placeholder="Your Contact Number"
+            (blur)="validateContact(signupData.contact)"
+            [class.input-error]="contactValidationError">
+          <span class="error-msg" *ngIf="contactValidationError">{{ contactValidationError }}</span>
+        </div>
+
+        <div class="form-group">
+          <input 
+            type="email" 
+            name="signupEmail" 
+            [(ngModel)]="signupData.email" 
+            required 
+            placeholder="Your Email"
+            (blur)="validateEmail(signupData.email)"
+            [class.input-error]="emailValidationError">
+          <span class="error-msg" *ngIf="emailValidationError">{{ emailValidationError }}</span>
+        </div>
+
+        <div class="form-group">
+          <input 
+            type="password" 
+            name="signupPassword" 
+            [(ngModel)]="signupData.password" 
+            required 
+            placeholder="Your Password"
+            (blur)="validatePassword(signupData.password)"
+            [class.input-error]="passwordValidationError">
+          <span class="error-msg" *ngIf="passwordValidationError">{{ passwordValidationError }}</span>
+        </div>
+
+        <span class="error-msg center-error" *ngIf="signupError">{{ signupError }}</span>
+
+        <button type="submit" class="btn btn-primary btn-block" [disabled]="!signupForm.form.valid">Signup</button>
+      </form>
+
+      <div class="card-footer">
+        <span class="brand-text"><span class="brand-pharm">pharma</span><span class="brand-care">care</span></span>
+        <a (click)="setTab('login')" class="switch-link">Login</a>
+      </div>
+    </div>
+  </div>
+</div>

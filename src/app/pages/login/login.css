@@ -1,0 +1,169 @@
+.login-page-container {
+  background-color: #0f172a;
+  min-height: calc(100vh - 80px);
+  padding-bottom: 80px;
+}
+
+.login-banner {
+  padding: 60px 0 100px 0;
+  text-align: center;
+  color: white;
+}
+
+.banner-inner h2 {
+  font-size: 32px;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.banner-inner p {
+  font-size: 15px;
+  opacity: 0.85;
+}
+
+.login-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  max-width: 450px;
+  margin: -40px auto 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+@media (max-width: 768px) {
+  .login-grid {
+    grid-template-columns: 1fr;
+    padding: 0 20px;
+  }
+}
+
+.card {
+  background-color: var(--card-bg);
+  border-radius: var(--radius-md);
+  box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 12px;
+}
+
+.card-header h3 {
+  font-size: 22px;
+  color: var(--dark-bg);
+}
+
+.role-selector {
+  display: flex;
+  background-color: #f1f5f9;
+  border-radius: 9999px;
+  padding: 4px;
+}
+
+.role-selector button {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 9999px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: var(--transition);
+}
+
+.role-selector button.active {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.role-badge {
+  background-color: rgba(2, 132, 199, 0.1);
+  color: var(--secondary-color);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Custom Checkbox */
+.checkbox-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+}
+
+.error-msg {
+  color: var(--danger-color);
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+  display: block;
+}
+
+.center-error {
+  text-align: center;
+}
+
+.input-error {
+  border-color: var(--danger-color) !important;
+}
+
+.btn-block {
+  width: 100%;
+  padding: 12px;
+  background-color: #06b6d4; /* Teal match */
+  color: white;
+}
+.btn-block:hover {
+  background-color: #0891b2;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 16px;
+  font-size: 14px;
+}
+
+.brand-text {
+  font-weight: 800;
+}
+.brand-text .brand-pharm { color: var(--secondary-color); }
+.brand-text .brand-care { color: var(--primary-color); }
+
+.switch-link {
+  color: var(--primary-color);
+  font-weight: 700;
+  cursor: pointer;
+}
+.switch-link:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,69 @@
+.page-header {
+  padding: 80px 0 120px 0;
+  text-align: center;
+  color: white;
+}
+
+.page-header h1 {
+  font-size: 42px;
+  color: white;
+  margin-bottom: 12px;
+}
+
+.page-header p {
+  font-size: 18px;
+  opacity: 0.9;
+}
+
+.service-detail-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  padding: 40px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: var(--transition);
+}
+
+.service-detail-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-color);
+}
+
+.serv-icon {
+  font-size: 42px;
+  background-color: rgba(13, 148, 136, 0.08);
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.service-detail-card h2 {
+  font-size: 24px;
+  color: var(--dark-bg);
+}
+
+.service-detail-card p {
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.service-detail-card ul {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.service-detail-card ul li {
+  font-size: 14px;
+  color: var(--text-dark);
+}

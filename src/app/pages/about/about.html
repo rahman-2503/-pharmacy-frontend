@@ -1,0 +1,59 @@
+<div class="about-page">
+  <section class="page-header wavy-banner-container">
+    <div class="container header-content">
+      <h1>About Us</h1>
+      <p>Building the digital highway for pharmacies in India since 2021.</p>
+    </div>
+    <div class="wavy-divider">
+      <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <path d="M985.66,92.83C906.67,72,823.78,31,743.84,14.19c-82.26-17.34-168.06-16.33-250.45.39-57.84,11.73-114,31.07-172,41.86A600.21,600.21,0,0,1,0,27.35V120H1200V95.8C1130.5,123.6,1048.2,109.3,985.66,92.83Z" class="shape-fill"></path>
+      </svg>
+    </div>
+  </section>
+
+  <section class="section-padding container mission-grid">
+    <div class="mission-text">
+      <h2>Empowering Local Pharmacies</h2>
+      <p>
+        At <strong>eVital pharmacare</strong>, we believe local pharmacies are the backbone of primary healthcare delivery. Our mission is to equip them with enterprise-grade cloud tools that simplify inventory management, automate compliance tracking, and integrate with surrounding clinics.
+      </p>
+      <p>
+        Our standalone ERP enables doctors and pharmacists to speak the same language, utilizing structured digital prescriptions, FHIR standards, and secured cloud hosting to protect patient data.
+      </p>
+    </div>
+    <div class="mission-stats">
+      <div class="stat-card">
+        <h3>10K+</h3>
+        <p>Active Pharmacies</p>
+      </div>
+      <div class="stat-card">
+        <h3>2M+</h3>
+        <p>Orders Processed</p>
+      </div>
+      <div class="stat-card">
+        <h3>99.9%</h3>
+        <p>System Uptime</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Careers Section -->
+  <section class="section-padding bg-white">
+    <div class="container">
+      <h2 class="section-title">Join Our Team</h2>
+      <p class="section-subtitle">We are always looking for passionate builders who want to make a difference in healthcare tech.</p>
+
+      <div class="careers-list">
+        <div class="career-item" *ngFor="let job of careers">
+          <div class="job-meta">
+            <h3>{{ job.role }}</h3>
+            <span class="badge badge-info">{{ job.dept }}</span>
+            <span class="job-loc">📍 {{ job.loc }}</span>
+          </div>
+          <p>{{ job.desc }}</p>
+          <a routerLink="/contact" class="btn btn-outline">Apply Now &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

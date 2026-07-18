@@ -1,0 +1,56 @@
+<header class="navbar">
+  <div class="container nav-container">
+    <div class="brand">
+      <a routerLink="/">
+        <span class="brand-pharm">pharma</span><span class="brand-care">care</span>
+      </a>
+    </div>
+
+    <nav class="nav-links">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Home</a>
+      <a routerLink="/services" routerLinkActive="active">Services</a>
+      <a routerLink="/about" routerLinkActive="active">About</a>
+      <a routerLink="/contact" routerLinkActive="active">Contact</a>
+    </nav>
+
+    <div class="nav-actions">
+      <!-- Notification Bell -->
+      <div class="notif-wrapper" *ngIf="isLoggedIn">
+        <button class="notif-bell-btn" (click)="toggleNotifs()" title="Notifications">
+          🔔
+          <span class="notif-badge" *ngIf="unreadCount > 0">{{ unreadCount }}</span>
+        </button>
+        <div class="notif-dropdown" *ngIf="showNotifs">
+          <div class="notif-dropdown-header">
+            <h4>Notifications</h4>
+            <span class="badge badge-info">{{ notifications.length }} total</span>
+          </div>
+          <div class="notif-dropdown-body">
+            <div class="notif-item" *ngFor="let notif of notifications" [class.unread]="!notif.read">
+              <div class="notif-icon">{{ getNotifIcon(notif.type || 'BROADCAST') }}</div>
+              <div class="notif-content">
+                <p>{{ notif.message }}</p>
+                <span class="notif-time">{{ notif.timestamp | date:'MMM d, h:mm a' }}</span>
+              </div>
+            </div>
+            <div class="notif-empty" *ngIf="notifications.length === 0">
+              No notifications yet.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ng-container *ngIf="!isLoggedIn; else loggedInTpl">
+        <a routerLink="/login" class="btn-nav btn-doctor">Sign In / Sign Up</a>
+      </ng-container>
+
+      <ng-template #loggedInTpl>
+        <div class="user-profile">
+          <span class="welcome-msg">Hi, <strong>{{ userName }}</strong></span>
+          <a [routerLink]="userRole === 'ADMIN' || userRole === 'admin' ? '/admin' : '/doctor'" class="btn-nav btn-dashboard">Dashboard</a>
+          <button (click)="logout()" class="btn-nav btn-logout">Logout</button>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</header>

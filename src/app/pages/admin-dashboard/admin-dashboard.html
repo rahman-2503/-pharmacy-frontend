@@ -1,0 +1,621 @@
+<div class="dashboard-layout container">
+  <!-- Sidebar Panel -->
+  <aside class="sidebar-panel">
+    <div class="sidebar-profile">
+      <div class="profile-avatar">A</div>
+      <div class="profile-name">System Admin</div>
+      <div class="profile-role">Store Operator</div>
+      <button class="btn btn-outline btn-sm change-pass-btn" (click)="setSection('change-password')" style="margin-top: 12px; width: 100%;">🔑 Change Password</button>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <ul class="sidebar-nav-list">
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'analytics'" (click)="setSection('analytics')">
+            📊 Overview Analytics
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'drugs-list'" (click)="setSection('drugs-list')">
+            📦 View Drugs List
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'drugs-form'" (click)="setSection('drugs-form')">
+            ➕ Add New Drug
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'suppliers'" (click)="setSection('suppliers')">
+            🚚 Suppliers & Alerts
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'orders'" (click)="setSection('orders')">
+            📋 Doctor Orders
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'reports'" (click)="setSection('reports')">
+            📈 Sales Reports
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'change-password'" (click)="setSection('change-password')">
+            🔑 Change Password
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content Panel -->
+  <main class="main-content-panel">
+    <!-- SECTION 0: OVERVIEW ANALYTICS -->
+    <div class="section-card" *ngIf="currentSection === 'analytics'">
+      <div class="section-hdr">Overview Analytics Dashboard</div>
+      <div class="tab-content">
+        <!-- Quick Stats Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-card item-teal">
+            <h3>₹{{ totalSalesValue }}</h3>
+            <p>Total Revenue Value</p>
+          </div>
+          <div class="metric-card item-blue">
+            <h3>₹{{ totalCollections }}</h3>
+            <p>Revenue Collected</p>
+          </div>
+          <div class="metric-card item-orange">
+            <h3>₹{{ totalOutstanding }}</h3>
+            <p>Balance Outstanding</p>
+          </div>
+        </div>
+
+        <!-- Charts Layout (2 columns: Orders, Sales) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; flex-wrap: wrap;">
+          <div class="chart-box" style="height: 350px;">
+            <h4>Order Status Distribution</h4>
+            <div style="position: relative; height: 260px;">
+              <canvas id="ordersChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-box" style="height: 350px;">
+            <h4>Sales Revenue by Drug (₹)</h4>
+            <div style="position: relative; height: 260px;">
+              <canvas id="salesChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stock Levels Full-Width Chart -->
+        <div class="chart-box" style="height: 400px;">
+          <h4>Inventory Catalog Stock Levels</h4>
+          <div style="position: relative; height: 310px;">
+            <canvas id="stockChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 1: ADD NEW DRUG (FORM) -->
+    <div class="section-card" *ngIf="currentSection === 'drugs-form'">
+      <div class="section-hdr">{{ isEditingDrug ? 'Modify Drug Record' : 'Register New Drug' }}</div>
+      <div class="tab-content">
+        <div class="form-container">
+          <h3>Fill Catalog Information</h3>
+          <form (ngSubmit)="submitDrugForm()" #drugForm="ngForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Drug Name</label>
+                <input type="text" name="name" [(ngModel)]="drugFormModel.name" required placeholder="e.g. Actonel">
+              </div>
+              <div class="form-group">
+                <label>Price (₹)</label>
+                <input type="number" name="price" [(ngModel)]="drugFormModel.price" required min="1">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Initial Stock / Quantity</label>
+                <input type="number" name="stock" [(ngModel)]="drugFormModel.stock" required min="0">
+              </div>
+              <div class="form-group">
+                <label>Category</label>
+                <select name="category" [(ngModel)]="drugFormModel.category" required>
+                  <option value="" disabled>Select Category</option>
+                  <option value="fever">Fever</option>
+                  <option value="cold">Cold</option>
+                  <option value="painkiller">Painkiller</option>
+                  <option value="antibiotic">Antibiotic</option>
+                  <option value="cardiac">Cardiac</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group" style="width: 100%;">
+                <label>Drug Photo URL</label>
+                <input type="text" name="photoUrl" [(ngModel)]="drugFormModel.photoUrl" placeholder="Enter image URL (e.g. https://images.unsplash.com/...)">
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-outline" (click)="setSection('drugs-list'); isEditingDrug = false; drugFormModel = resetDrugForm()">Cancel</button>
+              <button type="submit" class="btn btn-primary" [disabled]="!drugForm.form.valid">
+                {{ isEditingDrug ? 'Update Stock' : 'Add to Inventory' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: VIEW DRUGS LIST -->
+    <div class="section-card" *ngIf="currentSection === 'drugs-list'">
+      <div class="section-hdr">Drugs Inventory List</div>
+      <div class="tab-content">
+        <!-- Search Bar & Actions -->
+        <div class="list-search-bar" style="display: flex; gap: 10px; align-items: center; justify-content: space-between; width: 100%; max-width: 100%; margin-bottom: 24px;">
+          <div style="display: flex; gap: 8px; flex: 1; max-width: 500px;">
+            <input 
+              type="text" 
+              [(ngModel)]="drugSearchQuery" 
+              placeholder="Find drugs by name or supplier..."
+              (keyup.enter)="applyDrugSearch()"
+              style="flex: 1;">
+            <button (click)="applyDrugSearch()" class="btn btn-secondary list-search-btn">Search</button>
+          </div>
+          <button (click)="isEditingDrug = false; drugFormModel = resetDrugForm(); setSection('drugs-form')" class="btn btn-primary">➕ Add New Drug</button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="pharmacare-table">
+            <thead>
+              <tr>
+                <th>Photo</th>
+                <th>Drug Name</th>
+                <th>Category</th>
+                <th>Quantity / Stock</th>
+                <th>Price</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let drug of filteredDrugs">
+                <td>
+                  <img [src]="drug.photoUrl" alt="{{ drug.name }}" style="width: 70px; height: 70px; border-radius: var(--radius-sm); object-fit: cover; background-color: #f1f5f9; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
+                </td>
+                <td><strong>{{ drug.name }}</strong></td>
+                <td><span class="badge badge-info" style="font-size: 11px; text-transform: capitalize; background-color: rgba(2, 132, 199, 0.1); color: var(--secondary-color); padding: 4px 8px; border-radius: 4px; font-weight: 600;">{{ drug.category || 'General' }}</span></td>
+                <td>{{ drug.stock }}</td>
+                <td>₹{{ drug.price }}</td>
+                <td class="table-actions">
+                  <button class="btn btn-secondary btn-sm" (click)="editDrug(drug)">Edit</button>
+                  <button class="btn btn-danger btn-sm" (click)="deleteDrug(drug.id! || drug.drugId!)">Delete</button>
+                </td>
+              </tr>
+              <tr *ngIf="filteredDrugs.length === 0">
+                <td colspan="6" class="center-text">No drugs recorded in database.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: SUPPLIERS & ALERTS -->
+    <div class="suppliers-alerts-layout" *ngIf="currentSection === 'suppliers'">
+      <!-- Left side: Suppliers Management -->
+      <div class="section-card flex-main-panel">
+        <div class="sub-tab-bar">
+          <button [class.active]="suppliersTab === 'form'" (click)="suppliersTab = 'form'">Supplier Form</button>
+          <button [class.active]="suppliersTab === 'list'" (click)="suppliersTab = 'list'">Supplier List</button>
+        </div>
+
+        <!-- Supplier Form -->
+        <div class="tab-content" *ngIf="suppliersTab === 'form'">
+          <div class="form-container">
+            <h3>{{ isEditingSupplier ? 'Modify Supplier Profile' : 'Register Wholesale Supplier' }}</h3>
+            <form (ngSubmit)="submitSupplierForm()" #supplierForm="ngForm">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Supplier Name</label>
+                  <input type="text" name="suppName" [(ngModel)]="supplierFormModel.name" required placeholder="Enter supplier business name">
+                </div>
+                <div class="form-group">
+                  <label>Email Address</label>
+                  <input type="email" name="suppEmail" [(ngModel)]="supplierFormModel.email" required placeholder="name@supplier.com">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Contact Number</label>
+                  <input type="tel" name="suppContact" [(ngModel)]="supplierFormModel.contact" required placeholder="Mobile number">
+                </div>
+                <div class="form-group">
+                  <label>Office Address</label>
+                  <input type="text" name="suppAddr" [(ngModel)]="supplierFormModel.address" required placeholder="City, State">
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="btn btn-outline" (click)="suppliersTab = 'list'; isEditingSupplier = false; supplierFormModel = resetSupplierForm()">Cancel</button>
+                <button type="submit" class="btn btn-primary" [disabled]="!supplierForm.form.valid">
+                  {{ isEditingSupplier ? 'Save Supplier' : 'Register' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Supplier List -->
+        <div class="tab-content" *ngIf="suppliersTab === 'list'">
+          <div class="table-responsive">
+            <table class="pharmacare-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Contact</th>
+                  <th>Address</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let s of suppliers">
+                  <td><strong>{{ s.name }}</strong></td>
+                  <td>{{ s.email }}</td>
+                  <td>{{ s.contact }}</td>
+                  <td>{{ s.address }}</td>
+                  <td class="table-actions">
+                    <button class="btn btn-secondary btn-sm" (click)="editSupplier(s)">Edit</button>
+                    <button class="btn btn-danger btn-sm" (click)="deleteSupplier(s.id!)">Delete</button>
+                  </td>
+                </tr>
+                <tr *ngIf="suppliers.length === 0">
+                  <td colspan="5" class="center-text">No supplier records found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right side: Send Notifications -->
+      <div class="section-card flex-side-panel">
+        <div class="section-hdr">Send Doctor Alert</div>
+        <div class="tab-content notif-send-body">
+          <p class="sub-txt">Notifications are delivered in real-time via RabbitMQ to all active doctor sessions.</p>
+          
+          <div class="form-group">
+            <label>Target Recipient:</label>
+            <select [(ngModel)]="notifFormModel.userId" name="notifDoctor">
+              <option value="" disabled>Select Doctor</option>
+              <option value="BROADCAST">📢 All Doctors (Broadcast)</option>
+              <option *ngFor="let d of doctors" [value]="d">{{ d }}</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Message:</label>
+            <textarea [(ngModel)]="notifFormModel.message" name="notifMsg" rows="4" placeholder="Enter notification message..."></textarea>
+          </div>
+
+          <button class="btn btn-secondary btn-block" (click)="sendCustomNotif()" [disabled]="!notifFormModel.userId || !notifFormModel.message">
+            Send Alert
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: DOCTOR ORDERS -->
+    <div class="section-card" *ngIf="currentSection === 'orders'">
+      <div class="section-hdr">Fulfill Doctor Placed Orders</div>
+      <div class="sub-tab-bar">
+        <button [class.active]="ordersTab === 'new'" (click)="ordersTab = 'new'">New Orders</button>
+        <button [class.active]="ordersTab === 'verified'" (click)="ordersTab = 'verified'">Verified Orders</button>
+        <button [class.active]="ordersTab === 'pickedUp'" (click)="ordersTab = 'pickedUp'">Picked Up Orders</button>
+      </div>
+
+      <!-- New Orders Tab -->
+      <div class="tab-content" *ngIf="ordersTab === 'new'">
+        <div class="table-responsive">
+          <table class="pharmacare-table">
+            <thead>
+              <tr>
+                <th>Doctor Contact Info</th>
+                <th>Drug Details</th>
+                <th>Total Cost</th>
+                <th>Payment State</th>
+                <th>Verify Dispatch / Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ng-container *ngFor="let order of orders">
+                <tr *ngIf="order.status === 'PENDING' || order.status === 'PLACED' || order.status === 'VERIFIED'">
+                  <td>
+                    <strong>{{ order.doctorName }}</strong><br>
+                    <span class="sub-txt">✉ {{ order.userId }}</span>
+                  </td>
+                  <td>
+                    <div class="order-drug-list">
+                      <span *ngFor="let name of order.drugNames || []; let idx = index" class="order-drug-tag">
+                        {{ name }} (x{{ order.quantities?.[idx] || 1 }})
+                      </span>
+                    </div>
+                  </td>
+                  <td><strong>₹{{ order.total }}</strong></td>
+                  <td>
+                    <span class="badge" [ngClass]="{
+                      'badge-warning': order.status === 'PENDING',
+                      'badge-info': order.status === 'PLACED',
+                      'badge-success': order.status === 'VERIFIED'
+                    }">
+                      {{ order.status === 'PENDING' ? 'Pending Pay' : (order.status === 'PLACED' ? 'Paid' : 'Verified') }}
+                    </span>
+                  </td>
+                  <td>
+                    <!-- If status is PENDING -->
+                    <span *ngIf="order.status === 'PENDING'" class="badge badge-warning">Awaiting Payment</span>
+
+                    <!-- If status is PLACED -> Show Verify Button -->
+                    <div *ngIf="order.status === 'PLACED'">
+                      <div *ngIf="verifyingOrderId === order.id || verifyingOrderId === order.orderId; else actionBtnTpl" class="inline-verify-box">
+                        <label style="display:block; font-size:12px; margin-bottom:4px;">Pickup Date:</label>
+                        <input type="date" [(ngModel)]="verifyPickupDate" class="verify-date-input" style="padding: 4px; font-size: 13px;">
+                        <div class="verify-row-actions" style="margin-top: 6px; display: flex; gap: 8px;">
+                          <button class="btn btn-success btn-sm" (click)="submitVerification(order.id! || order.orderId!)" style="padding: 4px 8px; font-size: 12px;">Verify</button>
+                          <button class="btn btn-outline btn-sm" (click)="cancelVerification()" style="padding: 4px 8px; font-size: 12px;">Cancel</button>
+                        </div>
+                      </div>
+                      <ng-template #actionBtnTpl>
+                        <button class="btn btn-primary btn-sm" (click)="startVerification(order.id! || order.orderId!)">Verify Order</button>
+                      </ng-template>
+                    </div>
+
+                    <!-- If status is VERIFIED -> Show Picked Up Button -->
+                    <div *ngIf="order.status === 'VERIFIED'" style="display: flex; flex-direction: column; gap: 6px;">
+                      <span style="font-size: 12px; color: var(--success-color); font-weight: 700;">Pickup: {{ order.pickupDate }}</span>
+                      <button class="btn btn-success btn-sm" (click)="markOrderPickedUp(order.id! || order.orderId!)" style="padding: 6px 12px; font-size: 13px;">Picked Up</button>
+                    </div>
+                  </td>
+                </tr>
+              </ng-container>
+              <tr *ngIf="!hasOrdersWithStatus(['PENDING','PLACED','VERIFIED'])">
+                <td colspan="5" class="center-text">No active pending orders in queue.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Verified Orders Tab -->
+      <div class="tab-content" *ngIf="ordersTab === 'verified'">
+        <div class="table-responsive">
+          <table class="pharmacare-table">
+            <thead>
+              <tr>
+                <th>Doctor Name</th>
+                <th>Doctor Contact</th>
+                <th>Doctor Email</th>
+                <th>Drug Names</th>
+                <th>Drug Prices</th>
+                <th>Quantities</th>
+                <th>Total</th>
+                <th>Pickup Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ng-container *ngFor="let order of orders">
+                <tr *ngIf="order.status === 'VERIFIED'">
+                  <td>{{ order.doctorName }}</td>
+                  <td>{{ order.doctorContact }}</td>
+                  <td>{{ order.userId }}</td>
+                  <td>
+                    <div class="flex-column-cell">
+                      <span *ngFor="let name of order.drugNames || []">{{ name }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="flex-column-cell">
+                      <span *ngFor="let p of order.drugPrices || []">₹{{ p }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="flex-column-cell">
+                      <span *ngFor="let q of order.quantities || []">{{ q }}</span>
+                    </div>
+                  </td>
+                  <td><strong>₹{{ order.total }}</strong></td>
+                  <td class="pickup-cell">
+                    <span>{{ order.pickupDate }}</span>
+                    <button class="btn btn-success btn-block btn-pickup" (click)="markOrderPickedUp(order.id! || order.orderId!)">Picked Up</button>
+                  </td>
+                </tr>
+              </ng-container>
+              <tr *ngIf="!hasOrdersWithStatus(['VERIFIED'])">
+                <td colspan="8" class="center-text">No verified orders awaiting dispatch.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Picked Up Orders Tab -->
+      <div class="tab-content" *ngIf="ordersTab === 'pickedUp'">
+        <div class="table-responsive">
+          <table class="pharmacare-table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Doctor Name</th>
+                <th>Email</th>
+                <th>Drug Details</th>
+                <th>Invoice Total</th>
+                <th>Paid Amount</th>
+                <th>Pickup Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ng-container *ngFor="let order of orders">
+                <tr *ngIf="order.status === 'PICKED'">
+                  <td><code>{{ order.id || order.orderId }}</code></td>
+                  <td><strong>{{ order.doctorName }}</strong></td>
+                  <td>{{ order.userId }}</td>
+                  <td>
+                    <div class="order-drug-list">
+                      <span *ngFor="let name of order.drugNames || []; let idx = index" class="order-drug-tag">
+                        {{ name }} (x{{ order.quantities?.[idx] || 1 }})
+                      </span>
+                    </div>
+                  </td>
+                  <td>₹{{ order.total }}</td>
+                  <td>₹{{ order.paidAmount || order.total }}</td>
+                  <td>{{ order.pickupDate }}</td>
+                  <td><span class="badge badge-success">Completed & Picked Up</span></td>
+                </tr>
+              </ng-container>
+              <tr *ngIf="!hasOrdersWithStatus(['PICKED'])">
+                <td colspan="8" class="center-text">No completed pick-ups recorded yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 5: SALES REPORTS -->
+    <div class="section-card" *ngIf="currentSection === 'reports'">
+      <div class="section-hdr">Generate Invoices & Accounts Reports</div>
+      <div class="sub-tab-bar">
+        <button [class.active]="reportsTab === 'chart'" (click)="reportsTab = 'chart'">Sales Chart Summary</button>
+        <button [class.active]="reportsTab === 'report'" (click)="reportsTab = 'report'">Sales Transaction Log</button>
+        
+        <div class="report-export-buttons">
+          <button class="btn btn-outline btn-sm" (click)="printReport()">🖨️ Print Report</button>
+          <button class="btn btn-primary btn-sm" (click)="downloadCSV()">📥 Download CSV</button>
+        </div>
+      </div>
+
+      <!-- Sales Chart Tab Content -->
+      <div class="tab-content" *ngIf="reportsTab === 'chart'">
+        <div class="metrics-grid">
+          <div class="metric-card item-teal">
+            <h3>₹{{ totalSalesValue }}</h3>
+            <p>Total Revenue Value</p>
+          </div>
+          <div class="metric-card item-blue">
+            <h3>₹{{ totalCollections }}</h3>
+            <p>Revenue Collected</p>
+          </div>
+          <div class="metric-card item-orange">
+            <h3>₹{{ totalOutstanding }}</h3>
+            <p>Balance Outstanding</p>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <h4>Billing Summary Aggregates (Teal = Revenue, Blue = Collected, Amber = Balance)</h4>
+          <div class="custom-chart-wrapper">
+            <div class="bar-group">
+              <div class="bar-label">Revenue</div>
+              <div class="bar-track">
+                <div class="bar-fill rev-fill" [style.width.%]="100"></div>
+              </div>
+              <span class="bar-value">₹{{ totalSalesValue }}</span>
+            </div>
+            <div class="bar-group">
+              <div class="bar-label">Collections</div>
+              <div class="bar-track">
+                <div class="bar-fill col-fill" [style.width.%]="totalSalesValue ? (totalCollections / totalSalesValue) * 100 : 0"></div>
+              </div>
+              <span class="bar-value">₹{{ totalCollections }}</span>
+            </div>
+            <div class="bar-group">
+              <div class="bar-label">Outstanding</div>
+              <div class="bar-track">
+                <div class="bar-fill out-fill" [style.width.%]="totalSalesValue ? (totalOutstanding / totalSalesValue) * 100 : 0"></div>
+              </div>
+              <span class="bar-value">₹{{ totalOutstanding }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sales Report Tab Content -->
+      <div class="tab-content" *ngIf="reportsTab === 'report'">
+        <div class="table-responsive print-area">
+          <table class="pharmacare-table">
+            <thead>
+              <tr>
+                <th>Drug Name</th>
+                <th>Date and Time</th>
+                <th>Total Amount</th>
+                <th>Paid Amount</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let rep of salesReports">
+                <td><strong>{{ rep.drugName }}</strong></td>
+                <td>{{ rep.dateAndTime | date:'yyyy-MM-dd HH:mm:ss' }}</td>
+                <td>₹{{ rep.totalAmount }}</td>
+                <td>₹{{ rep.paidAmount }}</td>
+                <td><strong>₹{{ rep.balance }}</strong></td>
+              </tr>
+              <tr *ngIf="salesReports.length === 0">
+                <td colspan="5" class="center-text">No transaction histories recorded yet.</td>
+              </tr>
+            </tbody>
+          </table>
+      </div>
+    </div>
+  </div>
+  <!-- SECTION 6: CHANGE PASSWORD -->
+    <div class="section-card" *ngIf="currentSection === 'change-password'">
+      <div class="section-hdr">Change Admin Password</div>
+      <div class="tab-content" style="padding: 24px;">
+        <div class="form-container" style="max-width: 500px; margin: 0 auto;">
+          <h3 style="margin-bottom: 20px; font-size: 16px;">Update Security Credentials</h3>
+          <div *ngIf="!passwordSuccess; else successTpl">
+            <form (ngSubmit)="submitPasswordChange()" #passForm="ngForm">
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px;">Old Password</label>
+                <input type="password" name="oldPassword" [(ngModel)]="passwordFormModel.oldPassword" required placeholder="Enter current password">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px;">New Password</label>
+                <input type="password" name="newPassword" [(ngModel)]="passwordFormModel.newPassword" required placeholder="Min 4 characters">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px;">Confirm New Password</label>
+                <input type="password" name="confirmPassword" [(ngModel)]="passwordFormModel.confirmPassword" required placeholder="Repeat new password">
+              </div>
+
+              <span class="error-msg" *ngIf="passwordError" style="margin-bottom: 12px; display: block; color: var(--danger-color); font-size: 13px;">{{ passwordError }}</span>
+
+              <div class="form-actions" style="display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end;">
+                <button type="button" class="btn btn-outline" (click)="setSection('analytics')" [disabled]="processingPassword">Cancel</button>
+                <button type="submit" class="btn btn-primary" [disabled]="!passForm.form.valid || processingPassword">
+                  {{ processingPassword ? 'Updating...' : 'Update Password' }}
+                </button>
+              </div>
+            </form>
+          </div>
+          <ng-template #successTpl>
+            <div class="modal-success-screen" style="text-align: center; padding: 30px 20px;">
+              <span class="success-check" style="font-size: 40px; color: var(--success-color); background-color: rgba(16, 185, 129, 0.1); width: 70px; height: 70px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; margin-bottom: 12px;">✓</span>
+              <p>{{ passwordSuccess }}</p>
+            </div>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
