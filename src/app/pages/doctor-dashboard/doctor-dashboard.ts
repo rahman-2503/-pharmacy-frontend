@@ -46,6 +46,11 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   // Notification polling
   private notifSub: Subscription | null = null;
 
+  // Loading states
+  loadingOrders = false;
+  loadingDrugs = false;
+  processingLabel = '';
+
   // Chart references
   ordersChart: any;
   spendChart: any;
@@ -201,6 +206,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   }
 
   loadDrugs() {
+    this.loadingDrugs = true;
     this.apiService.getDrugs().subscribe({
       next: (data) => {
         this.drugs = data;
@@ -211,14 +217,19 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           const key = d.id! || d.drugId!;
           this.quantitiesMap[key] = 1;
         });
+        this.loadingDrugs = false;
       },
-      error: (err) => console.error('Failed to load drugs', err)
+      error: (err) => {
+        console.error('Failed to load drugs', err);
+        this.loadingDrugs = false;
+      }
     });
   }
 
   loadOrders() {
     this.doctorUser = this.authService.getCurrentUser();
     if (this.doctorUser) {
+      this.loadingOrders = true;
       const userId = this.doctorUser.email || this.doctorUser.userId || '';
       this.apiService.getOrdersByUser(userId).subscribe({
         next: (data) => {
@@ -228,14 +239,17 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
             const idB = b.id || b.orderId || '';
             return idB > idA ? 1 : -1;
           });
-          // Initialize/refresh charts on load
+          this.loadingOrders = false;
           if (this.currentSection === 'dashboard') {
             setTimeout(() => {
               this.initCharts();
             }, 100);
           }
         },
-        error: (err) => console.error('Failed to load orders', err)
+        error: (err) => {
+          console.error('Failed to load orders', err);
+          this.loadingOrders = false;
+        }
       });
     }
   }
@@ -404,56 +418,54 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=100&q=80',
       handler: (response: any) => {
         console.log('Razorpay payment successful:', response);
+        this.processingLabel = 'Verifying payment...';
         const paymentId = response.razorpay_payment_id;
 
         if (isBulk) {
-          // Parallel payment success callbacks for all bulk orders!
           const paymentCallbacks = orders.map(order => {
             const orderId = order.id || order.orderId || '';
             const orderAmount = order.total || 0;
-            // Generate a unique dummy Razorpay Order ID for each sub-payment
             const dummyRzpOrderId = 'order_bulk_' + orderId + '_' + Math.random().toString(36).substring(2, 7);
-
             return this.apiService.submitPaymentSuccess({
               orderId: orderId,
               amount: orderAmount,
               paymentId: paymentId,
-              signature: '', // dynamically calculated by api.service.ts
+              signature: '',
               razorpayOrderId: dummyRzpOrderId
             });
           });
 
           forkJoin(paymentCallbacks).subscribe({
-            next: (responses) => {
-              // Direct frontend state sync update to PLACED for maximum resilience
+            next: () => {
+              this.processingLabel = 'Updating order status...';
               const statusUpdates = orders.map(order => {
                 const orderId = order.id || order.orderId || '';
                 return this.apiService.updateOrderStatus(orderId, 'PLACED');
               });
-
               forkJoin(statusUpdates).subscribe({
                 next: () => {
                   this.processingPayment = false;
-                  alert(`Checkout successful! Total Paid: ₹${amount}. Razorpay Payment ID: ${paymentId}`);
+                  this.processingLabel = '';
+                  alert(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`);
                   this.loadOrders();
                 },
-                error: (err) => {
-                  console.error('Failed to sync order states directly:', err);
+                error: () => {
                   this.processingPayment = false;
-                  alert(`Checkout successful! Total Paid: ₹${amount}. Razorpay Payment ID: ${paymentId}`);
+                  this.processingLabel = '';
+                  alert(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`);
                   this.loadOrders();
                 }
               });
             },
             error: (err) => {
               this.processingPayment = false;
-              alert('Payment callback verification failed.');
+              this.processingLabel = '';
+              alert('Payment callback verification failed. Your order may still be pending.');
               console.error(err);
               this.loadOrders();
             }
           });
         } else {
-          // Single order payment from history
           const order = orders[0];
           const orderId = order.id || order.orderId || '';
           const dummyRzpOrderId = 'order_' + orderId + '_' + Math.random().toString(36).substring(2, 7);
@@ -462,28 +474,30 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
             orderId: orderId,
             amount: amount,
             paymentId: paymentId,
-            signature: '', // dynamically calculated by api.service.ts
+            signature: '',
             razorpayOrderId: dummyRzpOrderId
           }).subscribe({
-            next: (res) => {
-              // Direct frontend state sync update to PLACED
+            next: () => {
+              this.processingLabel = 'Updating order status...';
               this.apiService.updateOrderStatus(orderId, 'PLACED').subscribe({
                 next: () => {
                   this.processingPayment = false;
-                  alert(`Payment successful! Razorpay Payment ID: ${paymentId}`);
+                  this.processingLabel = '';
+                  alert(`Payment successful! Payment ID: ${paymentId}`);
                   this.loadOrders();
                 },
-                error: (err) => {
-                  console.error('Failed to sync order state directly:', err);
+                error: () => {
                   this.processingPayment = false;
-                  alert(`Payment successful! Razorpay Payment ID: ${paymentId}`);
+                  this.processingLabel = '';
+                  alert(`Payment successful! Payment ID: ${paymentId}`);
                   this.loadOrders();
                 }
               });
             },
             error: (err) => {
               this.processingPayment = false;
-              alert('Payment callback verification failed.');
+              this.processingLabel = '';
+              alert('Payment callback verification failed. Your order may still be pending.');
               console.error(err);
               this.loadOrders();
             }
@@ -502,8 +516,8 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         ondismiss: () => {
           console.log('Payment modal dismissed');
           this.processingPayment = false;
+          this.processingLabel = '';
           
-          // Call payment failure endpoint to mark orders as FAILED
           if (isBulk) {
             const failCallbacks = orders.map(order => {
               const orderId = order.id || order.orderId || '';
@@ -511,18 +525,23 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
               return this.apiService.submitPaymentFailure({ orderId: orderId, amount: orderAmount });
             });
             forkJoin(failCallbacks).subscribe({
-              next: () => this.loadOrders(),
+              next: () => {
+                alert('Payment cancelled. Your order is saved as PENDING.');
+                this.loadOrders();
+              },
               error: () => this.loadOrders()
             });
           } else {
             const order = orders[0];
             const orderId = order.id || order.orderId || '';
             this.apiService.submitPaymentFailure({ orderId: orderId, amount: amount }).subscribe({
-              next: () => this.loadOrders(),
+              next: () => {
+                alert('Payment cancelled. Your order is saved as PENDING.');
+                this.loadOrders();
+              },
               error: () => this.loadOrders()
             });
           }
-          alert('Payment cancelled.');
         }
       }
     };

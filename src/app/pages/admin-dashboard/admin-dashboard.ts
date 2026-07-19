@@ -61,6 +61,8 @@ export class AdminDashboardComponent implements OnInit {
   totalCollections = 0;
   totalOutstanding = 0;
 
+  loading = false;
+
   constructor(private apiService: ApiService) {}
 
   ngOnInit() {
@@ -77,6 +79,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   loadAllData() {
+    this.loading = true;
     forkJoin([
       this.apiService.getDrugs(),
       this.apiService.getSuppliers(),
@@ -89,7 +92,6 @@ export class AdminDashboardComponent implements OnInit {
         this.suppliers = suppliers;
         this.orders = orders;
         
-        // Collect unique doctor emails for notification select
         const emails = new Set<string>();
         orders.forEach(o => {
           if (o.doctorEmail) emails.add(o.doctorEmail);
@@ -98,13 +100,16 @@ export class AdminDashboardComponent implements OnInit {
 
         this.salesReports = reports;
         this.calculateSalesAggregates();
+        this.loading = false;
         
-        // Initialize charts
         setTimeout(() => {
           this.initCharts();
         }, 100);
       },
-      error: (err) => console.error('Failed to load admin dashboard data', err)
+      error: (err) => {
+        console.error('Failed to load admin dashboard data', err);
+        this.loading = false;
+      }
     });
   }
 

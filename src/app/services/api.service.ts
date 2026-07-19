@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, forkJoin, of, from, BehaviorSubject } from 'rxjs';
-import { map, switchMap, catchError, filter } from 'rxjs/operators';
+import { Observable, forkJoin, of, from, BehaviorSubject, timer } from 'rxjs';
+import { map, switchMap, catchError, filter, timeout, retry } from 'rxjs/operators';
 import { User, Drug, Supplier, Order, SalesReport, Notification, OrderStatus } from '../models';
 import { environment } from '../../environments/environment';
 
@@ -97,6 +97,8 @@ export class ApiService {
   // --- Auth & Users API ---
   public login(credentials: { email: string; password?: string }): Observable<User> {
     return this.http.post(`${this.baseUrl}/users/login`, credentials, { responseType: 'text' }).pipe(
+      timeout(120000),
+      retry(1),
       switchMap(token => {
         const decoded = this.decodeToken(token);
         const userId = decoded?.userId || decoded?.id || decoded?.sub || credentials.email;
@@ -122,9 +124,12 @@ export class ApiService {
       email: user.email,
       password: user.password,
       contact: user.contact,
-      role: 'DOCTOR' // Strictly uppercase DOCTOR
+      role: 'DOCTOR'
     };
-    return this.http.post<User>(`${this.baseUrl}/users/signup`, payload);
+    return this.http.post<User>(`${this.baseUrl}/users/signup`, payload).pipe(
+      timeout(120000),
+      retry(1)
+    );
   }
 
   public getUserProfile(id: string): Observable<User> {
@@ -294,7 +299,7 @@ export class ApiService {
   // --- Orders API ---
   public getOrders(): Observable<Order[]> {
     return forkJoin([
-      this.http.get<any[]>(`${this.baseUrl}/orders`),
+      this.http.get<any[]>(`${this.baseUrl}/orders`).pipe(timeout(90000), retry(1)),
       this.getDrugs()
     ]).pipe(
       map(([orders, drugs]) => orders.map(o => this.joinOrderWithDrug(this.mapBackendOrderToFrontend(o), drugs))),
@@ -327,6 +332,8 @@ export class ApiService {
       quantity: order.quantity
     };
     return this.http.post<any>(`${this.baseUrl}/orders`, payload, { headers: this.getHeaders() }).pipe(
+      timeout(90000),
+      retry(1),
       map(o => this.mapBackendOrderToFrontend(o))
     );
   }
@@ -342,6 +349,8 @@ export class ApiService {
     }
     
     return this.http.put<any>(url, {}, { headers: this.getHeaders() }).pipe(
+      timeout(90000),
+      retry(1),
       map(o => this.mapBackendOrderToFrontend(o))
     );
   }
@@ -352,6 +361,8 @@ export class ApiService {
       headers: this.getHeaders(),
       responseType: 'text'
     }).pipe(
+      timeout(90000),
+      retry(1),
       map(res => JSON.parse(res))
     );
   }
@@ -388,7 +399,10 @@ export class ApiService {
       switchMap(realSignature => {
         const roundedAmount = Math.round(paymentDetails.amount || 0);
         const params = `?orderId=${paymentDetails.orderId}&amount=${roundedAmount}&paymentId=${paymentDetails.paymentId}&signature=${realSignature}&razorpayOrderId=${paymentDetails.razorpayOrderId}`;
-        return this.http.post<any>(`${this.baseUrl}/payment/success${params}`, {}, { headers: this.getHeaders() });
+        return this.http.post<any>(`${this.baseUrl}/payment/success${params}`, {}, { headers: this.getHeaders() }).pipe(
+          timeout(90000),
+          retry(1)
+        );
       })
     );
   }
@@ -396,7 +410,10 @@ export class ApiService {
   public submitPaymentFailure(paymentDetails: { orderId: string; amount: number }): Observable<any> {
     const roundedAmount = Math.round(paymentDetails.amount || 0);
     const params = `?orderId=${paymentDetails.orderId}&amount=${roundedAmount}`;
-    return this.http.post<any>(`${this.baseUrl}/payment/fail${params}`, {}, { headers: this.getHeaders() });
+    return this.http.post<any>(`${this.baseUrl}/payment/fail${params}`, {}, { headers: this.getHeaders() }).pipe(
+      timeout(90000),
+      retry(1)
+    );
   }
 
   // --- Notification Service API ---

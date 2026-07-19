@@ -125,8 +125,13 @@
         </button>
       </div>
 
+      <div *ngIf="loadingDrugs" style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <div class="spinner"></div>
+        <p style="margin-top: 12px;">Loading drugs inventory...</p>
+      </div>
+
       <!-- Drug Carousel (Full Width) -->
-      <div class="section-card">
+      <div class="section-card" *ngIf="!loadingDrugs">
         <div class="section-hdr">Catalog Drugs</div>
         <div class="tab-content" style="position: relative; overflow: hidden; padding: 24px 8px;">
           <div class="carousel-container" *ngIf="filteredDrugs.length > 0; else noDrugsTpl" style="display: flex; align-items: center;">
@@ -168,7 +173,11 @@
     <div class="section-card" *ngIf="currentSection === 'order-history'">
       <div class="section-hdr">Your Order Transaction History</div>
       <div class="tab-content">
-        <div class="table-responsive" *ngIf="orders.length > 0; else noOrdersTpl">
+        <div *ngIf="loadingOrders" style="text-align: center; padding: 40px; color: var(--text-muted);">
+          <div class="spinner"></div>
+          <p style="margin-top: 12px;">Loading order history...</p>
+        </div>
+        <div class="table-responsive" *ngIf="!loadingOrders && orders.length > 0; else noOrdersTpl">
           <table class="pharmacare-table">
             <thead>
               <tr>
@@ -260,6 +269,15 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- Processing Overlay -->
+<div class="processing-overlay" *ngIf="processingPayment">
+  <div class="processing-card">
+    <div class="spinner" style="width: 48px; height: 48px; border-width: 5px;"></div>
+    <p style="margin-top: 16px; font-size: 16px; font-weight: 600;">{{ processingLabel || 'Processing payment...' }}</p>
+    <p style="font-size: 13px; color: var(--text-muted); margin-top: 8px;">Please wait while we process your transaction.</p>
+  </div>
 </div>
 
 <!-- Slide-out Cart Drawer -->

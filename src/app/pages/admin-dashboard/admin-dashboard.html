@@ -51,6 +51,11 @@
 
   <!-- Main Content Panel -->
   <main class="main-content-panel">
+    <div *ngIf="loading" style="text-align: center; padding: 80px 20px;">
+      <div class="spinner" style="width: 48px; height: 48px; border-width: 5px;"></div>
+      <p style="margin-top: 16px; color: var(--text-muted); font-size: 15px;">Loading dashboard data...</p>
+    </div>
+    <div *ngIf="!loading">
     <!-- SECTION 0: OVERVIEW ANALYTICS -->
     <div class="section-card" *ngIf="currentSection === 'analytics'">
       <div class="section-hdr">Overview Analytics Dashboard</div>
@@ -616,6 +621,7 @@
           </ng-template>
         </div>
       </div>
+    </div>
     </div>
   </main>
 </div>

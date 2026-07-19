@@ -13,7 +13,7 @@ import { AuthService } from '../../services/auth.service';
 })
 export class LoginComponent implements OnInit {
   // Tabs: 'login' | 'signup'
-  activeTab: 'login' | 'signup' = 'signup';
+  activeTab: 'login' | 'signup' = 'login';
   
   // Login Role: 'doctor' | 'admin'
   loginRole: 'doctor' | 'admin' = 'doctor';
@@ -74,8 +74,8 @@ export class LoginComponent implements OnInit {
     this.loginRole = role;
     this.loginError = null;
     if (role === 'admin') {
-      this.loginData.email = 'admin@pharmacare.com';
-      this.loginData.password = 'admin123';
+      this.loginData.email = 'admin@pharmacy.com';
+      this.loginData.password = 'Admin@123';
     } else {
       this.loginData.email = '';
       this.loginData.password = '';
