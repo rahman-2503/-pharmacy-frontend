@@ -1,1 +1,7 @@
-/*    /index.html   200
+/login /index.html 200
+/admin /index.html 200
+/doctor /index.html 200
+/about /index.html 200
+/services /index.html 200
+/contact /index.html 200
+/* /index.html 200
