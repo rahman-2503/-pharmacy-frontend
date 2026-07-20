@@ -1,11 +1,11 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Drug, Order, User, OrderStatus, Notification } from '../../models';
 import { forkJoin, Subscription, interval, Subject } from 'rxjs';
-import { startWith, switchMap, takeUntil } from 'rxjs/operators';
+import { startWith, switchMap, takeUntil, finalize } from 'rxjs/operators';
 import Chart from 'chart.js/auto';
 
 declare var Razorpay: any;
@@ -80,7 +80,8 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
 
   constructor(
     private apiService: ApiService,
-    private authService: AuthService
+    private authService: AuthService,
+    private zone: NgZone
   ) {}
 
   ngOnInit() {
@@ -476,92 +477,95 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       description: isBulk ? 'Bulk Order Payment' : 'Order Payment',
       image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=100&q=80',
       handler: (response: any) => {
-        console.log('Razorpay payment successful:', response);
-        this.processingLabel = 'Verifying payment...';
-        const paymentId = response.razorpay_payment_id;
+        // Razorpay runs this callback outside Angular's zone, which prevents
+        // the "processing payment" spinner from hiding. Wrap all logic in
+        // zone.run() so change detection fires and the loader resets.
+        this.zone.run(() => {
+          console.log('Razorpay payment successful:', response);
+          this.processingLabel = 'Verifying payment...';
+          const paymentId = response.razorpay_payment_id;
 
-        if (isBulk) {
-          const paymentCallbacks = orders.map(order => {
+          if (isBulk) {
+            const paymentCallbacks = orders.map(order => {
+              const orderId = order.id || order.orderId || '';
+              const orderAmount = order.total || 0;
+              const dummyRzpOrderId = 'order_bulk_' + orderId + '_' + Math.random().toString(36).substring(2, 7);
+              return this.apiService.submitPaymentSuccess({
+                orderId: orderId,
+                amount: orderAmount,
+                paymentId: paymentId,
+                signature: '',
+                razorpayOrderId: dummyRzpOrderId
+              });
+            });
+
+            forkJoin(paymentCallbacks).pipe(
+              finalize(() => {
+                this.processingPayment = false;
+                this.processingLabel = '';
+              })
+            ).subscribe({
+              next: () => {
+                this.processingLabel = 'Updating order status...';
+                const statusUpdates = orders.map(order => {
+                  const orderId = order.id || order.orderId || '';
+                  return this.apiService.updateOrderStatus(orderId, 'PLACED');
+                });
+                forkJoin(statusUpdates).subscribe({
+                  next: () => {
+                    this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
+                    this.loadOrders(true);
+                  },
+                  error: () => {
+                    this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
+                    this.loadOrders(true);
+                  }
+                });
+              },
+              error: (err) => {
+                this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
+                console.error(err);
+                this.loadOrders(true);
+              }
+            });
+          } else {
+            const order = orders[0];
             const orderId = order.id || order.orderId || '';
-            const orderAmount = order.total || 0;
-            const dummyRzpOrderId = 'order_bulk_' + orderId + '_' + Math.random().toString(36).substring(2, 7);
-            return this.apiService.submitPaymentSuccess({
+            const dummyRzpOrderId = 'order_' + orderId + '_' + Math.random().toString(36).substring(2, 7);
+
+            this.apiService.submitPaymentSuccess({
               orderId: orderId,
-              amount: orderAmount,
+              amount: amount,
               paymentId: paymentId,
               signature: '',
               razorpayOrderId: dummyRzpOrderId
+            }).pipe(
+              finalize(() => {
+                this.processingPayment = false;
+                this.processingLabel = '';
+              })
+            ).subscribe({
+              next: () => {
+                this.processingLabel = 'Updating order status...';
+                this.apiService.updateOrderStatus(orderId, 'PLACED').subscribe({
+                  next: () => {
+                    this.showMessage(`Payment successful! Payment ID: ${paymentId}`, 'success');
+                    this.loadOrders(true);
+                  },
+                  error: () => {
+                    this.showMessage(`Payment successful! Payment ID: ${paymentId}`, 'success');
+                    this.loadOrders(true);
+                  }
+                });
+              },
+              error: (err) => {
+                this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
+                console.error(err);
+                this.loadOrders(true);
+              }
             });
-          });
-
-          forkJoin(paymentCallbacks).subscribe({
-            next: () => {
-              this.processingLabel = 'Updating order status...';
-              const statusUpdates = orders.map(order => {
-                const orderId = order.id || order.orderId || '';
-                return this.apiService.updateOrderStatus(orderId, 'PLACED');
-              });
-              forkJoin(statusUpdates).subscribe({
-                next: () => {
-                  this.processingPayment = false;
-                  this.processingLabel = '';
-                  this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
-                  this.loadOrders(true);
-                },
-                error: () => {
-                  this.processingPayment = false;
-                  this.processingLabel = '';
-                  this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
-                  this.loadOrders(true);
-                }
-              });
-            },
-            error: (err) => {
-              this.processingPayment = false;
-              this.processingLabel = '';
-              this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
-              console.error(err);
-              this.loadOrders(true);
-            }
-          });
-        } else {
-          const order = orders[0];
-          const orderId = order.id || order.orderId || '';
-          const dummyRzpOrderId = 'order_' + orderId + '_' + Math.random().toString(36).substring(2, 7);
-
-          this.apiService.submitPaymentSuccess({
-            orderId: orderId,
-            amount: amount,
-            paymentId: paymentId,
-            signature: '',
-            razorpayOrderId: dummyRzpOrderId
-          }).subscribe({
-            next: () => {
-              this.processingLabel = 'Updating order status...';
-              this.apiService.updateOrderStatus(orderId, 'PLACED').subscribe({
-                next: () => {
-                  this.processingPayment = false;
-                  this.processingLabel = '';
-                  this.showMessage(`Payment successful! Payment ID: ${paymentId}`, 'success');
-                  this.loadOrders(true);
-                },
-                error: () => {
-                  this.processingPayment = false;
-                  this.processingLabel = '';
-                  this.showMessage(`Payment successful! Payment ID: ${paymentId}`, 'success');
-                  this.loadOrders(true);
-                }
-              });
-            },
-            error: (err) => {
-              this.processingPayment = false;
-              this.processingLabel = '';
-              this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
-              console.error(err);
-              this.loadOrders(true);
-            }
-          });
-        }
+          }
+        });
       },
       prefill: {
         name: this.doctorUser?.name || '',

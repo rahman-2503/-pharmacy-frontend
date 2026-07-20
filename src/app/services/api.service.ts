@@ -46,27 +46,33 @@ export class ApiService {
   }
 
   // Helper: Join Order with Drug details
-  public joinOrderWithDrug(order: Order, drugs: Drug[]): Order {
+  // doctorNameMap: optional map of userId -> doctor display name (from /users)
+  public joinOrderWithDrug(order: Order, drugs: Drug[], doctorNameMap?: { [userId: string]: string }): Order {
     const drug = drugs.find(d => (d.id === order.drugId || d.drugId === order.drugId));
     if (drug) {
       order.drugName = drug.name;
       order.drugPrice = drug.price;
       order.total = drug.price * order.quantity;
       order.balance = order.paidAmount ? order.total - order.paidAmount : order.total;
-      
+
       // Compatibility attributes
       order.drugNames = [drug.name];
       order.drugPrices = [drug.price];
       order.quantities = [order.quantity];
-      order.doctorName = order.doctorName || 'Dr Shukla';
-      order.doctorContact = order.doctorContact || '7418529635';
+
+      // Dynamic doctor name: prefer map lookup, then existing value, then fallback
+      const resolvedName = (doctorNameMap && order.userId && doctorNameMap[order.userId])
+        ? doctorNameMap[order.userId]
+        : (order.doctorName || 'Doctor');
+      order.doctorName = resolvedName;
+      order.doctorContact = order.doctorContact || 'N/A';
       order.doctorEmail = order.userId;
     } else {
       order.drugName = 'Unknown Medicine';
       order.drugPrice = 0;
       order.total = 0;
       order.balance = 0;
-      
+
       order.drugNames = ['Unknown Medicine'];
       order.drugPrices = [0];
       order.quantities = [order.quantity];
@@ -146,6 +152,7 @@ export class ApiService {
 
   // --- Drugs API ---
   private drugsCache$ = new BehaviorSubject<Drug[] | null>(null);
+  private usersCache$ = new BehaviorSubject<User[] | null>(null);
 
   private mapBackendDrugsToFrontend(drugs: any[]): Drug[] {
     const defaultImages: { [key: string]: string } = {
@@ -198,6 +205,46 @@ export class ApiService {
   public searchDrugs(name: string): Observable<Drug[]> {
     return this.getDrugs().pipe(
       map(drugs => drugs.filter(d => d.name.toLowerCase().includes(name.toLowerCase())))
+    );
+  }
+
+  // Get all registered users (doctors + admin) for admin panel & doctor-name mapping
+  public getUsers(forceRefresh = false): Observable<User[]> {
+    if (this.usersCache$.value && !forceRefresh) {
+      return of(this.usersCache$.value);
+    }
+    return this.http.get<any[]>(`${this.baseUrl}/users`, { headers: this.getHeaders() }).pipe(
+      timeout(30000),
+      retry(1),
+      map(users => {
+        const mapped = (users || []).map(u => ({
+          id: u.id?.toString(),
+          userId: u.id?.toString(),
+          name: u.name || 'Unknown',
+          email: u.email,
+          contact: u.contact || u.phone || '',
+          role: u.role
+        } as User));
+        this.usersCache$.next(mapped);
+        return mapped;
+      }),
+      catchError(err => {
+        console.error('Failed to load users from backend', err);
+        return this.usersCache$.value ? of(this.usersCache$.value) : of([]);
+      })
+    );
+  }
+
+  // Build a map of userId -> display name from getUsers()
+  public getDoctorNameMap(): Observable<{ [userId: string]: string }> {
+    return this.getUsers().pipe(
+      map(users => {
+        const map: { [userId: string]: string } = {};
+        users.forEach(u => {
+          if (u.id) map[u.id] = u.name || 'Unknown';
+        });
+        return map;
+      })
     );
   }
 
@@ -386,13 +433,13 @@ export class ApiService {
   public submitPaymentSuccess(paymentDetails: { orderId: string; amount: number; paymentId: string; signature: string; razorpayOrderId: string }): Observable<any> {
     const secret = 'V6C0KvJ3x5g4df05mafrZVbq'; // Razorpay key.secret from application.properties
     const message = `${paymentDetails.razorpayOrderId}|${paymentDetails.paymentId}`;
-    
+
     return from(this.calculateHmacSHA256(message, secret)).pipe(
       switchMap(realSignature => {
         const roundedAmount = Math.round(paymentDetails.amount || 0);
         const params = `?orderId=${paymentDetails.orderId}&amount=${roundedAmount}&paymentId=${paymentDetails.paymentId}&signature=${realSignature}&razorpayOrderId=${paymentDetails.razorpayOrderId}`;
         return this.http.post<any>(`${this.baseUrl}/payment/success${params}`, {}, { headers: this.getHeaders() }).pipe(
-          timeout(90000),
+          timeout(30000),
           retry(1)
         );
       })
@@ -403,7 +450,7 @@ export class ApiService {
     const roundedAmount = Math.round(paymentDetails.amount || 0);
     const params = `?orderId=${paymentDetails.orderId}&amount=${roundedAmount}`;
     return this.http.post<any>(`${this.baseUrl}/payment/fail${params}`, {}, { headers: this.getHeaders() }).pipe(
-      timeout(90000),
+      timeout(30000),
       retry(1)
     );
   }

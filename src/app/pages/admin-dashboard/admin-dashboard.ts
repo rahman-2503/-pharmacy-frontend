@@ -2,9 +2,9 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
-import { Drug, Supplier, Order, SalesReport, Notification } from '../../models';
+import { Drug, Supplier, Order, SalesReport, Notification, User } from '../../models';
 import { forkJoin, Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { takeUntil, finalize } from 'rxjs/operators';
 import Chart from 'chart.js/auto';
 
 @Component({
@@ -15,8 +15,8 @@ import Chart from 'chart.js/auto';
   styleUrl: './admin-dashboard.css'
 })
 export class AdminDashboardComponent implements OnInit, OnDestroy {
-  // Top Level Sections: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password'
-  currentSection: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password' = 'analytics';
+  // Top Level Sections: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password' | 'users'
+  currentSection: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password' | 'users' = 'analytics';
 
   // Chart references
   ordersChart: any;
@@ -36,6 +36,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   orders: Order[] = [];
   salesReports: SalesReport[] = [];
   doctors: string[] = []; // To send notifications to
+
+  // Registered users (doctors + admin) for the Users section & doctor-name mapping
+  allUsers: User[] = [];
+  loadingUsers = false;
+  doctorNameMap: { [userId: string]: string } = {};
+
+  // Orders doctor filter dropdown
+  selectedDoctorFilter: string = 'ALL';
 
   // Search queries
   drugSearchQuery: string = '';
@@ -69,6 +77,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   loadingDrugs = false;
   loadingOrders = false;
   loadingSuppliers = false;
+  verifyingFlag = false;
   private destroy$ = new Subject<void>();
   private readonly CACHE_KEY = 'admin_dashboard_cache_v1';
 
@@ -77,6 +86,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.restoreFromCache();
     this.loadAllData();
+    this.loadUsers();
   }
 
   ngOnDestroy() {
@@ -117,13 +127,34 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     } catch { /* ignore */ }
   }
 
-  setSection(section: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password') {
+  setSection(section: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password' | 'users') {
     this.currentSection = section;
     if (section === 'analytics') {
       setTimeout(() => {
         this.initCharts();
       }, 150);
     }
+  }
+
+  // Load all registered users (doctors + admin) and build a userId -> name map
+  loadUsers() {
+    this.loadingUsers = true;
+    this.apiService.getUsers().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (users) => {
+        this.allUsers = users.filter(u => u.role !== 'ADMIN');
+        this.doctorNameMap = {};
+        users.forEach(u => {
+          if (u.id) this.doctorNameMap[u.id] = u.name || 'Unknown';
+        });
+        // Re-resolve doctor names on existing orders
+        this.orders = this.orders.map(o => this.apiService.joinOrderWithDrug(o, this.drugs, this.doctorNameMap));
+        this.loadingUsers = false;
+      },
+      error: (err) => {
+        console.error('Failed to load users', err);
+        this.loadingUsers = false;
+      }
+    });
   }
 
   loadAllData() {
@@ -140,8 +171,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.drugs = drugs;
         this.filteredDrugs = [...drugs];
         this.suppliers = suppliers;
-        this.orders = orders.map(o => this.apiService.joinOrderWithDrug(o, drugs));
-        
+        this.orders = orders.map(o => this.apiService.joinOrderWithDrug(o, drugs, this.doctorNameMap));
+
         const emails = new Set<string>();
         orders.forEach(o => {
           if (o.doctorEmail) emails.add(o.doctorEmail);
@@ -153,7 +184,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.dataLoaded = true;
         this.persistCache();
-        
+
         if (this.currentSection === 'analytics') {
           setTimeout(() => {
             this.initCharts();
@@ -289,15 +320,23 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   loadOrders() {
-    this.apiService.getOrders().subscribe(data => {
-      this.orders = data;
-      
+    this.apiService.getOrders().pipe(takeUntil(this.destroy$)).subscribe(data => {
+      this.orders = data.map(o => this.apiService.joinOrderWithDrug(o, this.drugs, this.doctorNameMap));
+
       const emails = new Set<string>();
       data.forEach(o => {
         if (o.doctorEmail) emails.add(o.doctorEmail);
       });
       this.doctors = Array.from(emails);
     });
+  }
+
+  // Orders filtered by the selected doctor in the dropdown
+  get filteredOrders(): Order[] {
+    if (!this.selectedDoctorFilter || this.selectedDoctorFilter === 'ALL') {
+      return this.orders;
+    }
+    return this.orders.filter(o => o.userId === this.selectedDoctorFilter);
   }
 
   loadReports() {
@@ -450,28 +489,46 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       alert('Please specify a pickup date');
       return;
     }
+    if (this.verifyingFlag) return;
 
-    // Verify order and set status to VERIFIED (microservices lifecycle)
-    this.apiService.updateOrderStatus(id, 'VERIFIED', this.verifyPickupDate).subscribe({
+    this.verifyingFlag = true;
+    this.apiService.updateOrderStatus(id, 'VERIFIED', this.verifyPickupDate).pipe(
+      finalize(() => {
+        this.verifyingFlag = false;
+      })
+    ).subscribe({
       next: () => {
-        alert('Order status transitioned to VERIFIED!');
         this.verifyingOrderId = null;
+        this.verifyPickupDate = '';
         this.loadOrders();
         this.loadReports();
       },
-      error: (err) => alert('Failed to verify order')
+      error: (err) => {
+        console.error('Failed to verify order', err);
+        this.verifyingOrderId = null;
+        this.loadOrders();
+        this.loadReports();
+      }
     });
   }
 
   markOrderPickedUp(id: string) {
-    // Pick up order and transition status to PICKED
-    this.apiService.updateOrderStatus(id, 'PICKED').subscribe({
+    if (this.verifyingFlag) return;
+    this.verifyingFlag = true;
+    this.apiService.updateOrderStatus(id, 'PICKED').pipe(
+      finalize(() => {
+        this.verifyingFlag = false;
+      })
+    ).subscribe({
       next: () => {
-        alert('Order picked up! Status transitioned to PICKED.');
         this.loadOrders();
         this.loadReports();
       },
-      error: (err) => alert('Failed to complete dispatch')
+      error: (err) => {
+        console.error('Failed to complete dispatch', err);
+        this.loadOrders();
+        this.loadReports();
+      }
     });
   }
 
@@ -616,6 +673,6 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   hasOrdersWithStatus(statuses: string[]): boolean {
-    return this.orders.some(o => statuses.includes(o.status));
+    return this.filteredOrders.some(o => statuses.includes(o.status));
   }
 }

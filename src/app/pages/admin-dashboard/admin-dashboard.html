@@ -41,6 +41,11 @@
           </button>
         </li>
         <li>
+          <button class="sidebar-nav-item" [class.active]="currentSection === 'users'" (click)="setSection('users')">
+            👥 Registered Doctors
+          </button>
+        </li>
+        <li>
           <button class="sidebar-nav-item" [class.active]="currentSection === 'change-password'" (click)="setSection('change-password')">
             🔑 Change Password
           </button>
@@ -319,6 +324,16 @@
     <!-- SECTION 4: DOCTOR ORDERS -->
     <div class="section-card" *ngIf="currentSection === 'orders'">
       <div class="section-hdr">Fulfill Doctor Placed Orders</div>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
+        <label style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Filter by Doctor:</label>
+        <select [(ngModel)]="selectedDoctorFilter" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 13px;">
+          <option value="ALL">All Doctors</option>
+          <option *ngFor="let u of allUsers" [value]="u.id">{{ u.name }} (ID: {{ u.id }})</option>
+        </select>
+        <span *ngIf="selectedDoctorFilter !== 'ALL'" style="font-size: 12px; color: var(--primary-color);">
+          Showing orders for {{ doctorNameMap[selectedDoctorFilter] }}
+        </span>
+      </div>
       <div class="sub-tab-bar">
         <button [class.active]="ordersTab === 'new'" (click)="ordersTab = 'new'">New Orders</button>
         <button [class.active]="ordersTab === 'verified'" (click)="ordersTab = 'verified'">Verified Orders</button>
@@ -339,7 +354,7 @@
               </tr>
             </thead>
             <tbody>
-              <ng-container *ngFor="let order of orders">
+              <ng-container *ngFor="let order of filteredOrders">
                 <tr *ngIf="order.status === 'PENDING' || order.status === 'PLACED' || order.status === 'VERIFIED'">
                   <td>
                     <strong>{{ order.doctorName }}</strong><br>
@@ -414,7 +429,7 @@
               </tr>
             </thead>
             <tbody>
-              <ng-container *ngFor="let order of orders">
+              <ng-container *ngFor="let order of filteredOrders">
                 <tr *ngIf="order.status === 'VERIFIED'">
                   <td>{{ order.doctorName }}</td>
                   <td>{{ order.doctorContact }}</td>
@@ -466,7 +481,7 @@
               </tr>
             </thead>
             <tbody>
-              <ng-container *ngFor="let order of orders">
+              <ng-container *ngFor="let order of filteredOrders">
                 <tr *ngIf="order.status === 'PICKED'">
                   <td><code>{{ order.id || order.orderId }}</code></td>
                   <td><strong>{{ order.doctorName }}</strong></td>
@@ -490,6 +505,42 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4B: REGISTERED DOCTORS (USERS) -->
+    <div class="section-card" *ngIf="currentSection === 'users'">
+      <div class="section-hdr">Registered Doctors</div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+        All doctors who have registered on the platform. Use the Doctor ID to cross-reference their orders.
+      </p>
+      <div class="table-responsive">
+        <table class="pharmacare-table">
+          <thead>
+            <tr>
+              <th>Doctor ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let u of allUsers">
+              <td><strong>{{ u.id }}</strong></td>
+              <td>{{ u.name }}</td>
+              <td>{{ u.email }}</td>
+              <td>{{ u.contact || 'N/A' }}</td>
+              <td><span class="badge badge-info">{{ u.role || 'DOCTOR' }}</span></td>
+            </tr>
+            <tr *ngIf="!loadingUsers && allUsers.length === 0">
+              <td colspan="5" class="center-text">No doctors registered yet.</td>
+            </tr>
+            <tr *ngIf="loadingUsers">
+              <td colspan="5" class="center-text">Loading registered doctors…</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
