@@ -65,11 +65,17 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   loading = false;
   dataLoaded = false;
   loadError = false;
+  loadingCharts = false;
+  loadingDrugs = false;
+  loadingOrders = false;
+  loadingSuppliers = false;
   private destroy$ = new Subject<void>();
+  private readonly CACHE_KEY = 'admin_dashboard_cache_v1';
 
   constructor(private apiService: ApiService) {}
 
   ngOnInit() {
+    this.restoreFromCache();
     this.loadAllData();
   }
 
@@ -81,6 +87,34 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   reloadData() {
     this.dataLoaded = false;
     this.loadAllData();
+  }
+
+  private restoreFromCache() {
+    try {
+      const raw = localStorage.getItem(this.CACHE_KEY);
+      if (raw) {
+        const c = JSON.parse(raw);
+        this.drugs = c.drugs || [];
+        this.filteredDrugs = [...this.drugs];
+        this.suppliers = c.suppliers || [];
+        this.orders = c.orders || [];
+        this.salesReports = c.salesReports || [];
+        this.calculateSalesAggregates();
+        this.dataLoaded = true;
+      }
+    } catch { /* ignore cache errors */ }
+  }
+
+  private persistCache() {
+    try {
+      localStorage.setItem(this.CACHE_KEY, JSON.stringify({
+        drugs: this.drugs,
+        suppliers: this.suppliers,
+        orders: this.orders,
+        salesReports: this.salesReports,
+        ts: Date.now()
+      }));
+    } catch { /* ignore */ }
   }
 
   setSection(section: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password') {
@@ -118,6 +152,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.calculateSalesAggregates();
         this.loading = false;
         this.dataLoaded = true;
+        this.persistCache();
         
         if (this.currentSection === 'analytics') {
           setTimeout(() => {

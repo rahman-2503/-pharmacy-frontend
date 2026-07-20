@@ -51,15 +51,11 @@
 
   <!-- Main Content Panel -->
   <main class="main-content-panel">
-    <div *ngIf="loading" style="text-align: center; padding: 80px 20px;">
-      <div class="spinner" style="width: 48px; height: 48px; border-width: 5px;"></div>
-      <p style="margin-top: 16px; color: var(--text-muted); font-size: 15px;">Loading dashboard data...</p>
-    </div>
-    <div *ngIf="loadError && !loading" style="text-align: center; padding: 80px 20px;">
+    <div *ngIf="loadError" style="text-align: center; padding: 40px 20px;">
       <p style="color: var(--text-muted); font-size: 15px; margin-bottom: 16px;">Failed to load dashboard data. The server may be waking up.</p>
       <button class="btn btn-primary" (click)="reloadData()">Retry</button>
     </div>
-    <div *ngIf="!loading">
+    <div>
     <!-- SECTION 0: OVERVIEW ANALYTICS -->
     <div class="section-card" *ngIf="currentSection === 'analytics'">
       <div class="section-hdr">Overview Analytics Dashboard</div>

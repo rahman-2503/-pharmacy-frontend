@@ -85,9 +85,42 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.doctorUser = this.authService.getCurrentUser();
+    this.restoreFromCache();
     this.loadDrugs();
     this.loadOrders();
     this.startNotificationPolling();
+  }
+
+  private restoreFromCache() {
+    try {
+      const raw = localStorage.getItem(this.CACHE_KEY);
+      if (raw) {
+        const c = JSON.parse(raw);
+        if (c.drugs && c.drugs.length) {
+          this.drugs = c.drugs;
+          this.filteredDrugs = [...c.drugs];
+          this.drugsLoaded = true;
+          this.drugs.forEach(d => {
+            const key = d.id! || d.drugId!;
+            this.quantitiesMap[key] = 1;
+          });
+        }
+        if (c.orders && c.orders.length) {
+          this.orders = c.orders;
+          this.ordersLoaded = true;
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  private persistCache() {
+    try {
+      localStorage.setItem(this.CACHE_KEY, JSON.stringify({
+        drugs: this.drugs,
+        orders: this.orders,
+        ts: Date.now()
+      }));
+    } catch { /* ignore */ }
   }
 
   ngOnDestroy() {
@@ -218,6 +251,8 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     return this.orders.some(o => statuses.includes(o.status));
   }
 
+  private readonly CACHE_KEY = 'doctor_dashboard_cache_v1';
+
   loadDrugs(forceRefresh = false) {
     if (forceRefresh) {
       this.drugsLoaded = false;
@@ -236,6 +271,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           this.quantitiesMap[key] = 1;
         });
         this.loadingDrugs = false;
+        this.persistCache();
       },
       error: (err) => {
         console.error('Failed to load drugs', err);
@@ -264,6 +300,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
             return idB > idA ? 1 : -1;
           });
           this.loadingOrders = false;
+          this.persistCache();
           if (this.currentSection === 'dashboard') {
             setTimeout(() => this.initCharts(), 100);
           }
