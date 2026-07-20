@@ -152,6 +152,7 @@
                 </div>
                 <h4 style="font-size: 16px; margin-bottom: 2px; font-weight: 700;">{{ drug.name }}</h4>
                 <p style="font-size: 13px; font-weight: 700; color: var(--primary-color);">Price: ₹{{ drug.price }}</p>
+                <p style="font-size: 11px; color: var(--text-muted);" *ngIf="drug.supplierEmail">🏭 {{ supplierMap[drug.supplierEmail] || drug.supplierEmail }}</p>
                 
                 <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
                   <label style="font-weight: 600;">Qty:</label>
@@ -267,6 +268,9 @@
                 <div class="drug-view-stock" [class.low-stock]="drug.stock < 10">
                   Stock: {{ drug.stock }}
                 </div>
+              </div>
+              <div class="drug-view-supplier" *ngIf="drug.supplierEmail">
+                🏭 Supplier: {{ supplierMap[drug.supplierEmail] || drug.supplierEmail }}
               </div>
             </div>
           </div>

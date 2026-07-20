@@ -151,6 +151,16 @@
               </div>
             </div>
 
+            <div class="form-row">
+              <div class="form-group" style="width: 100%;">
+                <label>Supplier</label>
+                <select name="supplierEmail" [(ngModel)]="drugFormModel.supplierEmail">
+                  <option value="">No Supplier / Unknown</option>
+                  <option *ngFor="let s of suppliers" [value]="s.email || s.contact">{{ s.name }}</option>
+                </select>
+              </div>
+            </div>
+
             <div class="form-actions">
               <button type="button" class="btn btn-outline" (click)="setSection('drugs-list'); isEditingDrug = false; drugFormModel = resetDrugForm()">Cancel</button>
               <button type="submit" class="btn btn-primary" [disabled]="!drugForm.form.valid">
@@ -189,6 +199,7 @@
                 <th>Category</th>
                 <th>Quantity / Stock</th>
                 <th>Price</th>
+                <th>Supplier</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -201,13 +212,17 @@
                 <td><span class="badge badge-info" style="font-size: 11px; text-transform: capitalize; background-color: rgba(2, 132, 199, 0.1); color: var(--secondary-color); padding: 4px 8px; border-radius: 4px; font-weight: 600;">{{ drug.category || 'General' }}</span></td>
                 <td>{{ drug.stock }}</td>
                 <td>₹{{ drug.price }}</td>
+                <td>
+                  <span *ngIf="drug.supplierEmail; else noSupplierTpl">{{ supplierMapAdmin[drug.supplierEmail] || drug.supplierEmail }}</span>
+                  <ng-template #noSupplierTpl><span style="color: var(--text-muted); font-size: 12px;">—</span></ng-template>
+                </td>
                 <td class="table-actions">
                   <button class="btn btn-secondary btn-sm" (click)="editDrug(drug)">Edit</button>
                   <button class="btn btn-danger btn-sm" (click)="deleteDrug(drug.id! || drug.drugId!)">Delete</button>
                 </td>
               </tr>
               <tr *ngIf="filteredDrugs.length === 0">
-                <td colspan="6" class="center-text">No drugs recorded in database.</td>
+                <td colspan="7" class="center-text">No drugs recorded in database.</td>
               </tr>
             </tbody>
           </table>

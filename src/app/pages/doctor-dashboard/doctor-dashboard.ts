@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
-import { Drug, Order, User, OrderStatus, Notification } from '../../models';
+import { Drug, Order, User, OrderStatus, Notification, Supplier } from '../../models';
 import { forkJoin, Subscription, interval, Subject } from 'rxjs';
 import { startWith, switchMap, takeUntil, finalize } from 'rxjs/operators';
 import Chart from 'chart.js/auto';
@@ -29,6 +29,8 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   doctorUser: User | null = null;
   drugs: Drug[] = [];
   filteredDrugs: Drug[] = [];
+  suppliers: Supplier[] = [];
+  supplierMap: { [email: string]: string } = {};
   searchQuery: string = '';
   
   // Quantities input mapping: drugId -> quantity
@@ -77,6 +79,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   checkoutOrders: Order[] = [];
   checkoutRzpOrders: any[] = [];
   isBulkPayment = false;
+  private paymentWatchdog: any = null;
 
   constructor(
     private apiService: ApiService,
@@ -89,7 +92,24 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.restoreFromCache();
     this.loadDrugs();
     this.loadOrders();
+    this.loadSuppliers();
     this.startNotificationPolling();
+  }
+
+  // Load suppliers and build email -> name map for displaying drug suppliers
+  loadSuppliers() {
+    this.apiService.getSuppliers().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (suppliers) => {
+        this.suppliers = suppliers;
+        const map: { [email: string]: string } = {};
+        suppliers.forEach(s => {
+          const key = (s.email || s.contact || '').toString();
+          if (key) map[key] = s.name;
+        });
+        this.supplierMap = map;
+      },
+      error: (err) => console.error('Failed to load suppliers', err)
+    });
   }
 
   private restoreFromCache() {
@@ -468,6 +488,21 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     }
 
     this.processingPayment = true;
+    this.processingLabel = 'Opening secure payment...';
+
+    // Watchdog: guarantee the loader never spins forever, even if the
+    // Razorpay callback never fires (popup blocked, network drop, etc.)
+    if (this.paymentWatchdog) {
+      clearTimeout(this.paymentWatchdog);
+    }
+    this.paymentWatchdog = window.setTimeout(() => {
+      if (this.processingPayment) {
+        this.processingPayment = false;
+        this.processingLabel = '';
+        this.showMessage('Payment is taking longer than expected. If money was deducted, your order is being processed.', 'info');
+        this.loadOrders(true);
+      }
+    }, 25000);
 
     const options = {
       key: 'rzp_test_SkUT7TYdihPuCN',
@@ -500,10 +535,11 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
             });
 
             forkJoin(paymentCallbacks).pipe(
-              finalize(() => {
-                this.processingPayment = false;
-                this.processingLabel = '';
-              })
+        finalize(() => {
+          this.processingPayment = false;
+          this.processingLabel = '';
+          if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+        })
             ).subscribe({
               next: () => {
                 this.processingLabel = 'Updating order status...';
@@ -540,10 +576,11 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
               signature: '',
               razorpayOrderId: dummyRzpOrderId
             }).pipe(
-              finalize(() => {
-                this.processingPayment = false;
-                this.processingLabel = '';
-              })
+        finalize(() => {
+          this.processingPayment = false;
+          this.processingLabel = '';
+          if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+        })
             ).subscribe({
               next: () => {
                 this.processingLabel = 'Updating order status...';
@@ -580,6 +617,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           console.log('Payment modal dismissed');
           this.processingPayment = false;
           this.processingLabel = '';
+          if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
           
           if (isBulk) {
             const failCallbacks = orders.map(order => {
@@ -609,8 +647,16 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       }
     };
 
-    const rzp = new Razorpay(options);
-    rzp.open();
+    try {
+      const rzp = new Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error('Failed to open Razorpay checkout', err);
+      this.processingPayment = false;
+      this.processingLabel = '';
+      if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+      this.showMessage('Could not open payment window. Please try again.', 'error');
+    }
   }
 
   openPaymentModal(order: Order) {

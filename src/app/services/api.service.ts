@@ -177,7 +177,8 @@ export class ApiService {
         price: d.price,
         stock: d.quantity, // map quantity to stock
         category: d.category,
-        photoUrl: photo
+        photoUrl: photo,
+        supplierEmail: d.supplierEmail || ''
       };
     });
   }
@@ -254,7 +255,8 @@ export class ApiService {
       category: drug.category || 'General',
       price: drug.price,
       quantity: drug.stock,
-      photoUrl: drug.photoUrl || ''
+      photoUrl: drug.photoUrl || '',
+      supplierEmail: drug.supplierEmail || ''
     };
     return this.http.post<any>(`${this.baseUrl}/inventory/drug`, payload, { headers: this.getHeaders() }).pipe(
       map(d => {
@@ -266,7 +268,8 @@ export class ApiService {
           price: d.price,
           stock: d.quantity,
           category: d.category,
-          photoUrl: d.photoUrl
+          photoUrl: d.photoUrl,
+          supplierEmail: d.supplierEmail || ''
         };
         if (this.drugsCache$.value) {
           this.drugsCache$.next([...this.drugsCache$.value, mapped]);
@@ -284,7 +287,8 @@ export class ApiService {
       category: drug.category || 'General',
       price: drug.price,
       quantity: drug.stock,
-      photoUrl: drug.photoUrl || ''
+      photoUrl: drug.photoUrl || '',
+      supplierEmail: drug.supplierEmail || ''
     };
     return this.http.put<any>(`${this.baseUrl}/inventory/drug/${id}`, payload, { headers: this.getHeaders() }).pipe(
       map(d => {
@@ -296,10 +300,11 @@ export class ApiService {
           price: d.price,
           stock: d.quantity,
           category: d.category,
-          photoUrl: d.photoUrl
+          photoUrl: d.photoUrl,
+          supplierEmail: d.supplierEmail || ''
         };
         if (this.drugsCache$.value) {
-          const updatedList = this.drugsCache$.value.map(item => 
+          const updatedList = this.drugsCache$.value.map(item =>
             (item.id === id || item.drugId === id) ? mapped : item
           );
           this.drugsCache$.next(updatedList);

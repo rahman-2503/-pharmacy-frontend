@@ -41,6 +41,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   allUsers: User[] = [];
   loadingUsers = false;
   doctorNameMap: { [userId: string]: string } = {};
+  supplierMapAdmin: { [email: string]: string } = {};
 
   // Orders doctor filter dropdown
   selectedDoctorFilter: string = 'ALL';
@@ -171,6 +172,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.drugs = drugs;
         this.filteredDrugs = [...drugs];
         this.suppliers = suppliers;
+        this.supplierMapAdmin = {};
+        suppliers.forEach(s => {
+          const key = (s.email || s.contact || '').toString();
+          if (key) this.supplierMapAdmin[key] = s.name;
+        });
         this.orders = orders.map(o => this.apiService.joinOrderWithDrug(o, drugs, this.doctorNameMap));
 
         const emails = new Set<string>();
@@ -316,6 +322,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   loadSuppliers() {
     this.apiService.getSuppliers().subscribe(data => {
       this.suppliers = data;
+      this.supplierMapAdmin = {};
+      data.forEach(s => {
+        const key = (s.email || s.contact || '').toString();
+        if (key) this.supplierMapAdmin[key] = s.name;
+      });
     });
   }
 
