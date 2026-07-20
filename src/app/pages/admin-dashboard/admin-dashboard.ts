@@ -64,6 +64,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   loading = false;
   dataLoaded = false;
+  loadError = false;
   private destroy$ = new Subject<void>();
 
   constructor(private apiService: ApiService) {}
@@ -77,18 +78,24 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  reloadData() {
+    this.dataLoaded = false;
+    this.loadAllData();
+  }
+
   setSection(section: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password') {
     this.currentSection = section;
-    if (section === 'analytics' && this.dataLoaded) {
+    if (section === 'analytics') {
       setTimeout(() => {
         this.initCharts();
-      }, 100);
+      }, 150);
     }
   }
 
   loadAllData() {
     if (this.dataLoaded) return;
     this.loading = true;
+    this.loadError = false;
     forkJoin([
       this.apiService.getDrugs(),
       this.apiService.getSuppliers(),
@@ -121,7 +128,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       error: (err) => {
         console.error('Failed to load admin dashboard data', err);
         this.loading = false;
-        this.dataLoaded = true;
+        this.loadError = true;
       }
     });
   }

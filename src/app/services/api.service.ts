@@ -181,7 +181,7 @@ export class ApiService {
     }
 
     return this.http.get<any[]>(`${this.baseUrl}/inventory/drug`).pipe(
-      timeout(90000),
+      timeout(30000),
       retry(1),
       map(drugs => {
         const mapped = this.mapBackendDrugsToFrontend(drugs);
@@ -290,7 +290,7 @@ export class ApiService {
   // --- Orders API ---
   public getOrders(): Observable<Order[]> {
     return this.http.get<any[]>(`${this.baseUrl}/orders`).pipe(
-      timeout(90000),
+      timeout(30000),
       retry(1),
       map(orders => orders.map(o => this.mapBackendOrderToFrontend(o))),
       catchError(() => of([]))

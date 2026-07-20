@@ -98,10 +98,10 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
 
   setSection(section: 'dashboard' | 'order-drugs' | 'order-history' | 'view-drugs') {
     this.currentSection = section;
-    if (section === 'dashboard' && this.ordersLoaded) {
+    if (section === 'dashboard') {
       setTimeout(() => {
         this.initCharts();
-      }, 100);
+      }, 150);
     }
   }
 
@@ -264,6 +264,9 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
             return idB > idA ? 1 : -1;
           });
           this.loadingOrders = false;
+          if (this.currentSection === 'dashboard') {
+            setTimeout(() => this.initCharts(), 100);
+          }
         },
         error: (err) => {
           console.error('Failed to load orders', err);
