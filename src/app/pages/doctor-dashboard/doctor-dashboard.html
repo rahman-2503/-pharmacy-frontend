@@ -304,6 +304,21 @@
   </div>
 </div>
 
+<!-- Manual "Complete Payment" prompt (shown when the Razorpay popup can't
+     auto-open, e.g. after bulk order placement the browser blocks popups) -->
+<div class="processing-overlay" *ngIf="showPayButton">
+  <div class="processing-card" style="max-width: 420px;">
+    <div style="font-size: 40px; text-align: center;">💳</div>
+    <h3 style="margin-top: 8px; font-size: 18px; font-weight: 700; text-align: center;">Complete Your Payment</h3>
+    <p style="font-size: 13px; color: var(--text-muted); margin-top: 8px; text-align: center;">
+      Your orders have been placed. Click below to open the secure Razorpay checkout and finish payment.
+    </p>
+    <button class="btn btn-primary" (click)="openPendingRazorpay()" style="margin-top: 18px; width: 100%; font-size: 15px; padding: 12px;">
+      Pay ₹{{ paymentAmount }} via Razorpay
+    </button>
+  </div>
+</div>
+
 <!-- Slide-out Cart Drawer -->
 <div class="cart-drawer-backdrop" *ngIf="showCartDrawer" (click)="showCartDrawer = false"></div>
 <div class="cart-drawer" [class.open]="showCartDrawer">

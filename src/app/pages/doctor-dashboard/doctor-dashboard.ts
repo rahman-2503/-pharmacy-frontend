@@ -82,6 +82,13 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   isBulkPayment = false;
   private paymentWatchdog: any = null;
 
+  // When the Razorpay popup can't auto-open (browser blocks popups opened
+  // outside a user gesture, e.g. after the async order-placement call), we
+  // surface a manual "Complete Payment" button so the user can open it from a
+  // real click.
+  showPayButton = false;
+  private pendingRzp: any = null;
+
   constructor(
     private apiService: ApiService,
     private authService: AuthService,
@@ -415,10 +422,23 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.processingPayment = true;
     this.paymentSuccessMsg = '';
     this.showPaymentModal = false;
+    this.showPayButton = false;
+    this.pendingRzp = null;
     this.paymentAmount = this.cartTotal;
     this.isBulkPayment = true;
     this.checkoutOrders = [];
     this.checkoutRzpOrders = [];
+
+    // Safety net: if order placement itself hangs (e.g. backend cold start),
+    // never leave the loader spinning forever.
+    if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+    this.paymentWatchdog = window.setTimeout(() => {
+      if (this.processingPayment && !this.showPayButton) {
+        this.processingPayment = false;
+        this.processingLabel = '';
+        this.showMessage('Order placement is taking longer than expected. Please check your orders shortly.', 'info');
+      }
+    }, 40000);
 
     // Create parallel placement orders, one for each drug
     const placements = this.cart.map(item => {
@@ -527,6 +547,8 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         // the "processing payment" spinner from hiding. Wrap all logic in
         // zone.run() so change detection fires and the loader resets.
         this.zone.run(() => {
+          this.showPayButton = false;
+          this.pendingRzp = null;
           console.log('Razorpay payment successful:', response);
           this.processingLabel = 'Verifying payment...';
           const paymentId = response.razorpay_payment_id;
@@ -625,6 +647,8 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       },
       modal: {
         ondismiss: () => {
+          this.showPayButton = false;
+          this.pendingRzp = null;
           console.log('Payment modal dismissed');
           this.processingPayment = false;
           this.processingLabel = '';
@@ -660,14 +684,68 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
 
     try {
       const rzp = new Razorpay(options);
-      rzp.open();
+      this.pendingRzp = rzp;
+
+      if (isBulk) {
+        // Bulk checkout reaches here after an async order-placement call, so the
+        // browser has dropped the user-gesture and will block an auto-opened
+        // popup. Instead, surface a manual "Complete Payment" button.
+        this.processingPayment = false;
+        this.processingLabel = '';
+        this.showPayButton = true;
+        this.showMessage('Orders placed. Complete your payment to confirm.', 'success');
+      } else {
+        // Single-order payment is invoked synchronously from a click, so the
+        // user gesture is still active and auto-open works.
+        rzp.open();
+        this.armPopupBlockCheck();
+      }
     } catch (err) {
       console.error('Failed to open Razorpay checkout', err);
       this.processingPayment = false;
       this.processingLabel = '';
+      this.showPayButton = false;
       if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
       this.showMessage('Could not open payment window. Please try again.', 'error');
     }
+  }
+
+  // Open the stored Razorpay instance from a real user click (used by the
+  // "Complete Payment" button for bulk checkout, where the auto-open popup
+  // would otherwise be blocked).
+  openPendingRazorpay() {
+    if (!this.pendingRzp) return;
+    this.showPayButton = false;
+    this.processingPayment = true;
+    this.processingLabel = 'Opening secure payment...';
+
+    if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+    this.paymentWatchdog = window.setTimeout(() => {
+      if (this.processingPayment) {
+        this.processingPayment = false;
+        this.processingLabel = '';
+        this.showMessage('Payment is taking longer than expected. If money was deducted, your order is being processed.', 'info');
+        this.loadOrders(true);
+      }
+    }, 25000);
+
+    this.armPopupBlockCheck();
+    this.pendingRzp.open();
+  }
+
+  // If the Razorpay modal iframe hasn't appeared shortly after open() (popup
+  // blocked), fall back to the manual "Complete Payment" button.
+  private armPopupBlockCheck() {
+    window.setTimeout(() => {
+      if (!this.processingPayment && !this.showPayButton) return;
+      const opened = document.querySelector('.razorpay-checkout-frame, .razorpay-container');
+      if (!opened) {
+        this.processingPayment = false;
+        this.processingLabel = '';
+        this.showPayButton = true;
+        this.showMessage('Payment window was blocked by your browser. Click "Complete Payment" to try again.', 'info');
+      }
+    }, 2500);
   }
 
   openPaymentModal(order: Order) {
