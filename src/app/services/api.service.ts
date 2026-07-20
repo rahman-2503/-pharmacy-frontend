@@ -118,7 +118,17 @@ export class ApiService {
             if (profile.role === 'DOCTOR') profile.role = 'doctor';
             if (profile.role === 'ADMIN') profile.role = 'admin';
             return profile;
-          })
+          }),
+          // If the profile fetch fails (e.g. transient 401), fall back to the
+          // claims already present in the freshly issued token so login still succeeds.
+          catchError(() => of({
+            id: userId,
+            userId: userId,
+            name: decoded?.name || (credentials.email ? credentials.email.split('@')[0] : 'User'),
+            email: decoded?.email || credentials.email,
+            role: decoded?.role === 'ADMIN' ? 'admin' : 'doctor',
+            token
+          } as User))
         );
       })
     );
