@@ -46,7 +46,7 @@ export class ApiService {
   }
 
   // Helper: Join Order with Drug details
-  private joinOrderWithDrug(order: Order, drugs: Drug[]): Order {
+  public joinOrderWithDrug(order: Order, drugs: Drug[]): Order {
     const drug = drugs.find(d => (d.id === order.drugId || d.drugId === order.drugId));
     if (drug) {
       order.drugName = drug.name;
@@ -289,14 +289,15 @@ export class ApiService {
 
   // --- Orders API ---
   public getOrders(): Observable<Order[]> {
-    return forkJoin([
-      this.http.get<any[]>(`${this.baseUrl}/orders`).pipe(timeout(90000), retry(1)),
-      this.getDrugs()
-    ]).pipe(
-      map(([orders, drugs]) => orders.map(o => this.joinOrderWithDrug(this.mapBackendOrderToFrontend(o), drugs))),
+    return this.http.get<any[]>(`${this.baseUrl}/orders`).pipe(
+      timeout(90000),
+      retry(1),
+      map(orders => orders.map(o => this.mapBackendOrderToFrontend(o))),
       catchError(() => of([]))
     );
   }
+
+
 
   public getOrdersByUser(userId: string): Observable<Order[]> {
     const userStr = localStorage.getItem('pharmacare_user_session');

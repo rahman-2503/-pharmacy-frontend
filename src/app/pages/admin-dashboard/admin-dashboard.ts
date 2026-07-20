@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { Drug, Supplier, Order, SalesReport, Notification } from '../../models';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import Chart from 'chart.js/auto';
 
 @Component({
@@ -13,7 +14,7 @@ import Chart from 'chart.js/auto';
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.css'
 })
-export class AdminDashboardComponent implements OnInit {
+export class AdminDashboardComponent implements OnInit, OnDestroy {
   // Top Level Sections: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password'
   currentSection: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password' = 'analytics';
 
@@ -62,6 +63,8 @@ export class AdminDashboardComponent implements OnInit {
   totalOutstanding = 0;
 
   loading = false;
+  dataLoaded = false;
+  private destroy$ = new Subject<void>();
 
   constructor(private apiService: ApiService) {}
 
@@ -69,28 +72,34 @@ export class AdminDashboardComponent implements OnInit {
     this.loadAllData();
   }
 
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   setSection(section: 'analytics' | 'drugs-list' | 'drugs-form' | 'suppliers' | 'orders' | 'reports' | 'change-password') {
     this.currentSection = section;
-    if (section === 'analytics') {
+    if (section === 'analytics' && this.dataLoaded) {
       setTimeout(() => {
         this.initCharts();
-      }, 50);
+      }, 100);
     }
   }
 
   loadAllData() {
+    if (this.dataLoaded) return;
     this.loading = true;
     forkJoin([
       this.apiService.getDrugs(),
       this.apiService.getSuppliers(),
       this.apiService.getOrders(),
       this.apiService.getSalesReports()
-    ]).subscribe({
+    ]).pipe(takeUntil(this.destroy$)).subscribe({
       next: ([drugs, suppliers, orders, reports]) => {
         this.drugs = drugs;
         this.filteredDrugs = [...drugs];
         this.suppliers = suppliers;
-        this.orders = orders;
+        this.orders = orders.map(o => this.apiService.joinOrderWithDrug(o, drugs));
         
         const emails = new Set<string>();
         orders.forEach(o => {
@@ -101,14 +110,18 @@ export class AdminDashboardComponent implements OnInit {
         this.salesReports = reports;
         this.calculateSalesAggregates();
         this.loading = false;
+        this.dataLoaded = true;
         
-        setTimeout(() => {
-          this.initCharts();
-        }, 100);
+        if (this.currentSection === 'analytics') {
+          setTimeout(() => {
+            this.initCharts();
+          }, 100);
+        }
       },
       error: (err) => {
         console.error('Failed to load admin dashboard data', err);
         this.loading = false;
+        this.dataLoaded = true;
       }
     });
   }
