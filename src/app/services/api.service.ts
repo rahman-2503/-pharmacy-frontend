@@ -177,21 +177,12 @@ export class ApiService {
 
   public getDrugs(forceRefresh = false): Observable<Drug[]> {
     if (this.drugsCache$.value && !forceRefresh) {
-      this.http.get<any[]>(`${this.baseUrl}/inventory/drug`).pipe(
-        map(drugs => this.mapBackendDrugsToFrontend(drugs)),
-        catchError(() => of([]))
-      ).subscribe(mapped => {
-        if (mapped.length > 0) {
-          this.drugsCache$.next(mapped);
-        }
-      });
-
-      return this.drugsCache$.asObservable().pipe(
-        filter((drugs): drugs is Drug[] => drugs !== null)
-      );
+      return of(this.drugsCache$.value);
     }
 
     return this.http.get<any[]>(`${this.baseUrl}/inventory/drug`).pipe(
+      timeout(90000),
+      retry(1),
       map(drugs => {
         const mapped = this.mapBackendDrugsToFrontend(drugs);
         this.drugsCache$.next(mapped);

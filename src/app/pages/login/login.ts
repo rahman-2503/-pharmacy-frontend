@@ -159,7 +159,10 @@ export class LoginComponent implements OnInit {
     }).subscribe({
       next: (user) => {
         console.log('Login successful:', user);
-        if (user.role === 'admin') {
+        const redirect = this.route.snapshot.queryParams['redirect'];
+        if (redirect) {
+          this.router.navigateByUrl(redirect);
+        } else if (user.role === 'admin') {
           this.router.navigate(['/admin']);
         } else {
           this.router.navigate(['/doctor']);

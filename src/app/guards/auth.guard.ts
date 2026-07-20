@@ -1,8 +1,8 @@
 import { inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
-export const adminGuard = () => {
+export const adminGuard = (): boolean | UrlTree => {
   const authService = inject(AuthService);
   const router = inject(Router);
   
@@ -10,12 +10,10 @@ export const adminGuard = () => {
     return true;
   }
   
-  console.warn('Access denied to admin path. Redirecting to login.');
-  router.navigate(['/login']);
-  return false;
+  return router.parseUrl('/login?redirect=/admin');
 };
 
-export const doctorGuard = () => {
+export const doctorGuard = (): boolean | UrlTree => {
   const authService = inject(AuthService);
   const router = inject(Router);
   
@@ -23,7 +21,5 @@ export const doctorGuard = () => {
     return true;
   }
   
-  console.warn('Access denied to doctor path. Redirecting to login.');
-  router.navigate(['/login']);
-  return false;
+  return router.parseUrl('/login?redirect=/doctor');
 };

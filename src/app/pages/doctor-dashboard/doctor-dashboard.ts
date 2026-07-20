@@ -50,6 +50,14 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   loadingOrders = false;
   loadingDrugs = false;
   processingLabel = '';
+  message: string | null = null;
+  messageType: 'success' | 'error' | 'info' = 'info';
+
+  private showMessage(msg: string, type: 'success' | 'error' | 'info' = 'info') {
+    this.message = msg;
+    this.messageType = type;
+    setTimeout(() => this.message = null, 6000);
+  }
 
   // Chart references
   ordersChart: any;
@@ -286,14 +294,14 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     if (qty <= 0) return;
     
     if (qty > drug.stock) {
-      alert(`Insufficient stock. Only ${drug.stock} items available.`);
+      this.showMessage(`Insufficient stock. Only ${drug.stock} items available.`, 'error');
       return;
     }
 
     const existing = this.cart.find(item => (item.drug.id === drug.id || item.drug.drugId === drug.drugId));
     if (existing) {
       if (existing.quantity + qty > drug.stock) {
-        alert(`Cannot add more. Combined cart quantity exceeds stock of ${drug.stock}.`);
+        this.showMessage(`Cannot add more. Combined cart quantity exceeds stock of ${drug.stock}.`, 'error');
         return;
       }
       existing.quantity += qty;
@@ -394,7 +402,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.processingPayment = false;
-        alert('Failed to place orders. Please try again.');
+        this.showMessage('Failed to place orders. Please try again.', 'error');
         console.error(err);
       }
     });
@@ -402,7 +410,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
 
   launchRazorpayCheckout(amount: number, isBulk: boolean, orders: Order[]) {
     if (amount <= 0) {
-      alert('Invalid payment amount.');
+      this.showMessage('Invalid payment amount.', 'error');
       this.processingPayment = false;
       return;
     }
@@ -446,13 +454,13 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
                 next: () => {
                   this.processingPayment = false;
                   this.processingLabel = '';
-                  alert(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`);
+                  this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
                   this.loadOrders();
                 },
                 error: () => {
                   this.processingPayment = false;
                   this.processingLabel = '';
-                  alert(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`);
+                  this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
                   this.loadOrders();
                 }
               });
@@ -460,7 +468,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
             error: (err) => {
               this.processingPayment = false;
               this.processingLabel = '';
-              alert('Payment callback verification failed. Your order may still be pending.');
+              this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
               console.error(err);
               this.loadOrders();
             }
@@ -483,13 +491,13 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
                 next: () => {
                   this.processingPayment = false;
                   this.processingLabel = '';
-                  alert(`Payment successful! Payment ID: ${paymentId}`);
+                  this.showMessage(`Payment successful! Payment ID: ${paymentId}`, 'success');
                   this.loadOrders();
                 },
                 error: () => {
                   this.processingPayment = false;
                   this.processingLabel = '';
-                  alert(`Payment successful! Payment ID: ${paymentId}`);
+                  this.showMessage(`Payment successful! Payment ID: ${paymentId}`, 'success');
                   this.loadOrders();
                 }
               });
@@ -497,7 +505,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
             error: (err) => {
               this.processingPayment = false;
               this.processingLabel = '';
-              alert('Payment callback verification failed. Your order may still be pending.');
+              this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
               console.error(err);
               this.loadOrders();
             }
@@ -524,24 +532,24 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
               const orderAmount = order.total || 0;
               return this.apiService.submitPaymentFailure({ orderId: orderId, amount: orderAmount });
             });
-            forkJoin(failCallbacks).subscribe({
-              next: () => {
-                alert('Payment cancelled. Your order is saved as PENDING.');
-                this.loadOrders();
-              },
-              error: () => this.loadOrders()
-            });
-          } else {
-            const order = orders[0];
-            const orderId = order.id || order.orderId || '';
-            this.apiService.submitPaymentFailure({ orderId: orderId, amount: amount }).subscribe({
-              next: () => {
-                alert('Payment cancelled. Your order is saved as PENDING.');
-                this.loadOrders();
-              },
-              error: () => this.loadOrders()
-            });
-          }
+              forkJoin(failCallbacks).subscribe({
+                next: () => {
+                  this.showMessage('Payment cancelled. Your order is saved as PENDING.', 'info');
+                  this.loadOrders();
+                },
+                error: () => this.loadOrders()
+              });
+            } else {
+              const order = orders[0];
+              const orderId = order.id || order.orderId || '';
+              this.apiService.submitPaymentFailure({ orderId: orderId, amount: amount }).subscribe({
+                next: () => {
+                  this.showMessage('Payment cancelled. Your order is saved as PENDING.', 'info');
+                  this.loadOrders();
+                },
+                error: () => this.loadOrders()
+              });
+            }
         }
       }
     };

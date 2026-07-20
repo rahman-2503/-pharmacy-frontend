@@ -1,4 +1,12 @@
 <div class="dashboard-layout container">
+  <div *ngIf="message" class="alert alert-{{ messageType }}" style="
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    padding: 12px 24px; border-radius: 8px; font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15); max-width: 400px;
+    background: {{ messageType === 'success' ? '#d4edda' : messageType === 'error' ? '#f8d7da' : '#d1ecf1' }};
+    color: {{ messageType === 'success' ? '#155724' : messageType === 'error' ? '#721c24' : '#0c5460' }};
+    border: 1px solid {{ messageType === 'success' ? '#c3e6cb' : messageType === 'error' ? '#f5c6cb' : '#bee5eb' }};
+  ">{{ message }}</div>
   <!-- Sidebar Panel -->
   <aside class="sidebar-panel">
     <div class="sidebar-profile">
