@@ -53,6 +53,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   loadingDrugs = false;
   ordersLoaded = false;
   drugsLoaded = false;
+  drugsLoadError = false;
   private destroy$ = new Subject<void>();
   processingLabel = '';
   message: string | null = null;
@@ -280,22 +281,32 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       this.loadingDrugs = true;
     }
     if (this.drugsLoaded && !forceRefresh) return;
+    this.drugsLoadError = false;
     this.loadingDrugs = true;
     this.apiService.getDrugs().pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => {
         this.drugs = data;
         this.filteredDrugs = [...data];
-        this.drugsLoaded = true;
-        
-        this.drugs.forEach(d => {
-          const key = d.id! || d.drugId!;
-          this.quantitiesMap[key] = 1;
-        });
+
+        if (data.length > 0) {
+          this.drugsLoaded = true;
+          this.drugs.forEach(d => {
+            const key = d.id! || d.drugId!;
+            this.quantitiesMap[key] = 1;
+          });
+          this.persistCache();
+        } else {
+          // Genuinely empty inventory — mark loaded so we don't spin forever,
+          // but do NOT persist an empty list over a good cache.
+          this.drugsLoaded = true;
+        }
         this.loadingDrugs = false;
-        this.persistCache();
       },
       error: (err) => {
         console.error('Failed to load drugs', err);
+        // Keep drugsLoaded = false so a later call (Retry / section switch)
+        // will attempt to fetch again instead of showing empty forever.
+        this.drugsLoadError = true;
         this.loadingDrugs = false;
       }
     });

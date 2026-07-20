@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, forkJoin, of, from, BehaviorSubject, timer } from 'rxjs';
+import { Observable, forkJoin, of, from, BehaviorSubject, timer, throwError } from 'rxjs';
 import { map, switchMap, catchError, filter, timeout, retry } from 'rxjs/operators';
 import { User, Drug, Supplier, Order, SalesReport, Notification, OrderStatus } from '../models';
 import { environment } from '../../environments/environment';
@@ -194,21 +194,31 @@ export class ApiService {
   }
 
   public getDrugs(forceRefresh = false): Observable<Drug[]> {
-    if (this.drugsCache$.value && !forceRefresh) {
+    // Only short-circuit on a non-empty cache; an empty cache (e.g. a previous
+    // cold-start failure) must NOT block a real refetch.
+    if (this.drugsCache$.value && this.drugsCache$.value.length && !forceRefresh) {
       return of(this.drugsCache$.value);
     }
 
     return this.http.get<any[]>(`${this.baseUrl}/inventory/drug`).pipe(
-      timeout(30000),
-      retry(1),
+      // Free-tier services can take 60-180s to wake from sleep; a short timeout
+      // would fail the very first load and show "no drug available". The first
+      // attempt warms the service; the retry then hits the now-warm instance.
+      timeout(150000),
+      retry({ count: 2, delay: 3000 }),
       map(drugs => {
         const mapped = this.mapBackendDrugsToFrontend(drugs);
-        this.drugsCache$.next(mapped);
+        if (mapped.length) {
+          this.drugsCache$.next(mapped);
+        }
         return mapped;
       }),
       catchError(err => {
         console.error('Failed to load drugs from backend', err);
-        return this.drugsCache$.value ? of(this.drugsCache$.value) : of([]);
+        if (this.drugsCache$.value && this.drugsCache$.value.length) {
+          return of(this.drugsCache$.value);
+        }
+        return throwError(() => err);
       })
     );
   }

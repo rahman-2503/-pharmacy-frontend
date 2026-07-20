@@ -172,7 +172,13 @@
             <button class="carousel-arrow right-arrow" (click)="scrollCarousel(1)" style="border: none; background: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; box-shadow: var(--shadow-sm); z-index: 10;">&rsaquo;</button>
           </div>
           <ng-template #noDrugsTpl>
-            <div style="text-align: center; padding: 30px; color: var(--text-muted);">No drugs found matching "{{ searchQuery }}"</div>
+            <div style="text-align: center; padding: 30px; color: var(--text-muted);">
+              <p *ngIf="!drugsLoadError">No drugs available{{ searchQuery ? ' matching "' + searchQuery + '"' : '' }}.</p>
+              <div *ngIf="drugsLoadError">
+                <p>Couldn't reach the drug inventory. The backend services may be warming up after idle &mdash; please retry.</p>
+                <button class="btn btn-outline btn-sm" (click)="loadDrugs(true)" style="margin-top: 8px;">Retry</button>
+              </div>
+            </div>
           </ng-template>
         </div>
       </div>
@@ -276,7 +282,13 @@
           </div>
         </div>
         <ng-template #noDrugsListTpl>
-          <div style="text-align: center; padding: 40px; color: var(--text-muted);">No drugs available in the catalogue.</div>
+          <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+            <p *ngIf="!drugsLoadError">No drugs available in the catalogue.</p>
+            <div *ngIf="drugsLoadError">
+              <p>Couldn't reach the drug inventory. The backend services may be warming up after idle &mdash; please retry.</p>
+              <button class="btn btn-outline btn-sm" (click)="loadDrugs(true)" style="margin-top: 8px;">Retry</button>
+            </div>
+          </div>
         </ng-template>
       </div>
     </div>
