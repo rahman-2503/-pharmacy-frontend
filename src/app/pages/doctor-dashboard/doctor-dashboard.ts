@@ -4,8 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Drug, Order, User, OrderStatus, Notification, Supplier } from '../../models';
-import { forkJoin, Subscription, interval, Subject } from 'rxjs';
-import { startWith, switchMap, takeUntil, finalize } from 'rxjs/operators';
+import { forkJoin, Subscription, interval, Subject, of } from 'rxjs';
+import { startWith, switchMap, takeUntil, finalize, catchError } from 'rxjs/operators';
 import Chart from 'chart.js/auto';
 
 declare var Razorpay: any;
@@ -174,9 +174,14 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     const email = this.doctorUser.email || this.doctorUser.userId || '';
     this.notifSub = interval(5000).pipe(
       startWith(0),
-      switchMap(() => this.apiService.getNotificationsByUser(email))
+      switchMap(() => this.apiService.getNotificationsByUser(email).pipe(
+        // Tolerate transient errors (e.g. a backend service asleep on the free
+        // tier) without breaking the polling stream or spamming the console.
+        catchError(() => of<Notification[]>([]))
+      ))
     ).subscribe({
       next: (data) => {
+        if (!data || !data.length) return;
         this.notifications = data.sort((a, b) => {
           const tA = a.timestamp || '';
           const tB = b.timestamp || '';
