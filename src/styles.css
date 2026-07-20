@@ -416,3 +416,105 @@ table.pharmacare-table tr:hover td {
   }
 }
 
+/* =========================================================
+   MOTION & EFFECTS SYSTEM (zero-dependency, JS-assisted)
+   ========================================================= */
+
+/* --- Scroll Reveal --- */
+html.reveal-enabled [data-reveal] {
+  opacity: 0;
+  transform: translateY(34px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+html.reveal-enabled [data-reveal='left']  { transform: translateX(-48px); }
+html.reveal-enabled [data-reveal='right'] { transform: translateX(48px); }
+html.reveal-enabled [data-reveal='scale'] { transform: scale(0.92); }
+html.reveal-enabled [data-reveal='fade']  { transform: none; }
+html.reveal-enabled [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- Hover lift (cards) --- */
+.hover-lift {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-lift:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* --- Animated gradient text --- */
+.gradient-text {
+  background: linear-gradient(100deg, var(--primary-color), var(--secondary-color), var(--primary-color));
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: gradientShift 6s linear infinite;
+}
+@keyframes gradientShift {
+  0%   { background-position: 0% center; }
+  100% { background-position: 220% center; }
+}
+
+/* --- Floating animation (orbs, badges, icons) --- */
+.float {
+  animation: floaty 5s ease-in-out infinite;
+}
+.float-slow {
+  animation: floaty 8s ease-in-out infinite;
+}
+.float-delay-1 { animation-delay: 0.6s; }
+.float-delay-2 { animation-delay: 1.2s; }
+.float-delay-3 { animation-delay: 1.8s; }
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-14px); }
+}
+
+/* --- Pulsing glow for CTAs / live badges --- */
+.pulse-glow {
+  animation: pulseGlow 2.4s ease-in-out infinite;
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.45); }
+  50%      { box-shadow: 0 0 0 14px rgba(13, 148, 136, 0); }
+}
+
+/* --- Decorative floating orbs (background) --- */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(8px);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+  animation: orbFloat 14s ease-in-out infinite;
+}
+.orb--teal   { background: radial-gradient(circle at 30% 30%, #2dd4bf, #0d9488); }
+.orb--blue   { background: radial-gradient(circle at 30% 30%, #38bdf8, #0284c7); }
+.orb--violet { background: radial-gradient(circle at 30% 30%, #a78bfa, #7c3aed); }
+.orb--amber  { background: radial-gradient(circle at 30% 30%, #fbbf24, #f59e0b); }
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(30px, -40px) scale(1.08); }
+  66%      { transform: translate(-25px, 25px) scale(0.95); }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html.reveal-enabled [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .float, .float-slow, .pulse-glow, .orb, .gradient-text {
+    animation: none !important;
+  }
+}
+

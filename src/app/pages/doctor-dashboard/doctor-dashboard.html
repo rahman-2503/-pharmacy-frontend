@@ -45,7 +45,7 @@
   <!-- Main Content Panel -->
   <main class="main-content-panel">
     <!-- SECTION 0: OVERVIEW STATS -->
-    <div class="section-card" *ngIf="currentSection === 'dashboard'">
+    <div class="section-card" data-reveal="up"*ngIf="currentSection === 'dashboard'">
       <div class="section-hdr">Welcome back, Dr. {{ doctorUser?.name }}</div>
       <div class="tab-content">
         <!-- Quick Stats Metrics -->
@@ -139,7 +139,7 @@
       </div>
 
       <!-- Drug Carousel (Full Width) -->
-      <div class="section-card" *ngIf="!loadingDrugs">
+      <div class="section-card" data-reveal="up"*ngIf="!loadingDrugs">
         <div class="section-hdr">Catalog Drugs</div>
         <div class="tab-content" style="position: relative; overflow: hidden; padding: 24px 8px;">
           <div class="carousel-container" *ngIf="filteredDrugs.length > 0; else noDrugsTpl" style="display: flex; align-items: center;">
@@ -179,7 +179,7 @@
     </div>
 
     <!-- SECTION 2: ORDER HISTORY -->
-    <div class="section-card" *ngIf="currentSection === 'order-history'">
+    <div class="section-card" data-reveal="up"*ngIf="currentSection === 'order-history'">
       <div class="section-hdr">Your Order Transaction History</div>
       <div class="tab-content">
         <div *ngIf="loadingOrders" style="text-align: center; padding: 40px; color: var(--text-muted);">
@@ -251,7 +251,7 @@
     </div>
 
     <!-- SECTION 3: VIEW DRUGS -->
-    <div class="section-card" *ngIf="currentSection === 'view-drugs'">
+    <div class="section-card" data-reveal="up"*ngIf="currentSection === 'view-drugs'">
       <div class="section-hdr">Drug Catalogue</div>
       <div class="tab-content" style="padding: 24px;">
         <div class="drugs-grid" *ngIf="drugs.length > 0; else noDrugsListTpl">

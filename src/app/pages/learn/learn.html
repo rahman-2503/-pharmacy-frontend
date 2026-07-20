@@ -1,7 +1,7 @@
 <div class="learn-page">
   <section class="page-header wavy-banner-container">
-    <div class="container header-content">
-      <h1>eMpact & Learning Center</h1>
+    <div class="container header-content" data-reveal="up">
+      <h1 class="gradient-text">eMpact & Learning Center</h1>
       <p>Explore success stories from pharmacies using eVital, and watch step-by-step training guides.</p>
     </div>
     <div class="wavy-divider">
@@ -17,7 +17,7 @@
     <p class="section-subtitle">Read how local pharmacies upgraded their workflows and achieved substantial business growth.</p>
 
     <div class="case-studies-grid">
-      <div class="detail-case-card" *ngFor="let cs of caseStudies">
+      <div class="detail-case-card hover-lift" *ngFor="let cs of caseStudies; let i = index" data-reveal="up" [attr.data-reveal-delay]="i * 100">
         <div class="detail-case-header">
           <h3>{{ cs.title }}</h3>
           <span class="loc-text">📍 {{ cs.location }}</span>
@@ -49,7 +49,7 @@
       <p class="section-subtitle">Get started with step-by-step videos demonstrating typical daily workflows.</p>
 
       <div class="grid grid-3">
-        <div class="video-card" *ngFor="let vid of videos">
+        <div class="video-card hover-lift" *ngFor="let vid of videos; let i = index" data-reveal="up" [attr.data-reveal-delay]="i * 100">
           <div class="video-thumbnail">
             <span class="play-icon">▶</span>
             <span class="duration-badge">{{ vid.duration }}</span>

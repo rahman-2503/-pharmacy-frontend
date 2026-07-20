@@ -1,8 +1,10 @@
 <div class="login-page-container">
   <!-- Wavy Header Banner -->
   <div class="login-banner wavy-banner-container">
-    <div class="container banner-inner">
-      <h2>Welcome to pharmacare</h2>
+    <span class="orb orb--teal" style="width: 180px; height: 180px; top: -30px; right: 6%;"></span>
+    <span class="orb orb--blue" style="width: 140px; height: 140px; bottom: 10px; left: 4%; animation-delay: -4s;"></span>
+    <div class="container banner-inner" data-reveal="up">
+      <h2 class="gradient-text">Welcome to pharmacare</h2>
       <p>Secure portal access for authorized doctor clinics and store administrators.</p>
     </div>
     <div class="wavy-divider">
@@ -14,7 +16,7 @@
 
   <div class="container login-grid">
     <!-- Login Card (Left Side) -->
-    <div class="card login-card" *ngIf="activeTab === 'login'">
+    <div class="card login-card hover-lift" *ngIf="activeTab === 'login'" data-reveal="up">
       <div class="card-header">
         <h3>Login</h3>
         <div class="role-selector">
@@ -65,7 +67,7 @@
     </div>
 
     <!-- Signup Card (Right Side) -->
-    <div class="card signup-card" *ngIf="activeTab === 'signup'">
+    <div class="card signup-card hover-lift" *ngIf="activeTab === 'signup'" data-reveal="up">
       <div class="card-header">
         <h3>Signup</h3>
         <span class="role-badge">Doctor Account</span>

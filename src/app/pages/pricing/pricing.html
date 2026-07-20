@@ -1,7 +1,7 @@
 <div class="pricing-page">
   <section class="page-header wavy-banner-container">
-    <div class="container header-content">
-      <h1>Subscription Plans</h1>
+    <div class="container header-content" data-reveal="up">
+      <h1 class="gradient-text">Subscription Plans</h1>
       <p>Flexible packages designed to support retail, clinics, and multi-location pharmacy chains.</p>
     </div>
     <div class="wavy-divider">
@@ -13,7 +13,7 @@
 
   <section class="section-padding container">
     <div class="grid grid-4">
-      <div class="pricing-card" [ngClass]="{'recommended-card': plan.recommended}" *ngFor="let plan of plans">
+      <div class="pricing-card hover-lift" [ngClass]="{'recommended-card': plan.recommended}" *ngFor="let plan of plans; let i = index" data-reveal="up" [attr.data-reveal-delay]="i * 100">
         <span class="reco-badge" *ngIf="plan.recommended">RECOMMENDED</span>
         <h3>{{ plan.name }}</h3>
         <p class="price-desc">{{ plan.desc }}</p>
@@ -36,19 +36,19 @@
       <p class="section-subtitle">Got questions about subscription renewals or custom integrations? We have answers.</p>
 
       <div class="faq-grid">
-        <div class="faq-item">
+        <div class="faq-item hover-lift" data-reveal="up" data-reveal-delay="0">
           <h4>Can I change my plan later?</h4>
           <p>Yes, you can upgrade or downgrade your plan at any time. When upgrading, your payment will be prorated based on the remaining days of your current cycle.</p>
         </div>
-        <div class="faq-item">
+        <div class="faq-item hover-lift" data-reveal="up" data-reveal-delay="90">
           <h4>Are there any setup fees?</h4>
           <p>No, there are no hidden setup fees. All standard onboarding training, data imports, and initial supplier configurations are included in the annual fee.</p>
         </div>
-        <div class="faq-item">
+        <div class="faq-item hover-lift" data-reveal="up" data-reveal-delay="180">
           <h4>Do you offer monthly cycles?</h4>
           <p>To reduce administrative billing overhead and offer the lowest prices possible, our standard plans are billed annually. Custom monthly options are available for Capsule/Injection packages upon request.</p>
         </div>
-        <div class="faq-item">
+        <div class="faq-item hover-lift" data-reveal="up" data-reveal-delay="270">
           <h4>Is my database backed up securely?</h4>
           <p>Absolutely. All databases are securely hosted on AWS with automatic point-in-time recovery and database mirroring, fully compliant with FHIR regulations.</p>
         </div>
