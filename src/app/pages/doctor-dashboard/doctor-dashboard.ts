@@ -703,7 +703,6 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         // Single-order payment is invoked synchronously from a click, so the
         // user gesture is still active and auto-open works.
         rzp.open();
-        this.armPopupBlockCheck();
       }
     } catch (err) {
       console.error('Failed to open Razorpay checkout', err);
@@ -734,23 +733,18 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       }
     }, 25000);
 
-    this.armPopupBlockCheck();
-    this.pendingRzp.open();
-  }
-
-  // If the Razorpay modal iframe hasn't appeared shortly after open() (popup
-  // blocked), fall back to the manual "Complete Payment" button.
-  private armPopupBlockCheck() {
-    window.setTimeout(() => {
-      if (!this.processingPayment && !this.showPayButton) return;
-      const opened = document.querySelector('.razorpay-checkout-frame, .razorpay-container');
-      if (!opened) {
-        this.processingPayment = false;
-        this.processingLabel = '';
-        this.showPayButton = true;
-        this.showMessage('Payment window was blocked by your browser. Click "Complete Payment" to try again.', 'info');
-      }
-    }, 2500);
+    try {
+      this.pendingRzp.open();
+    } catch (err) {
+      console.error('Failed to open Razorpay checkout on manual click', err);
+      this.processingPayment = false;
+      this.processingLabel = '';
+      if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+      this.showMessage('Could not open the payment window. Please try again.', 'error');
+      this.pendingRzp = null;
+      // Allow the user to try again
+      this.showPayButton = true;
+    }
   }
 
   openPaymentModal(order: Order) {
