@@ -160,6 +160,20 @@ export class ApiService {
     });
   }
 
+  public toggleUserStatus(id: string): Observable<string> {
+    return this.http.patch(`${this.baseUrl}/users/${id}/status`, {}, {
+      headers: this.getHeaders(),
+      responseType: 'text'
+    });
+  }
+
+  public deleteUser(id: string): Observable<string> {
+    return this.http.delete(`${this.baseUrl}/users/${id}`, {
+      headers: this.getHeaders(),
+      responseType: 'text'
+    });
+  }
+
   // --- Drugs API ---
   private drugsCache$ = new BehaviorSubject<Drug[] | null>(null);
   private usersCache$ = new BehaviorSubject<User[] | null>(null);

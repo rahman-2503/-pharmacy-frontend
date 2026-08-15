@@ -556,7 +556,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.loadUsers();
           this.showMessage('User blocked successfully.', 'success');
         },
-        error: (err) => {
+        error: (err: any) => {
           console.error('Failed to block user', err);
           this.showMessage('Failed to block user.', 'error');
         }
@@ -572,7 +572,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.loadUsers();
           this.showMessage('User unblocked successfully.', 'success');
         },
-        error: (err) => {
+        error: (err: any) => {
           console.error('Failed to unblock user', err);
           this.showMessage('Failed to unblock user.', 'error');
         }
@@ -588,13 +588,15 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.loadUsers();
           this.showMessage('User deleted successfully.', 'success');
         },
-        error: (err) => {
+        error: (err: any) => {
           console.error('Failed to delete user', err);
           this.showMessage('Failed to delete user.', 'error');
         }
       });
     }
   }
+
+  sendCustomNotif() {
     if (!this.notifFormModel.userId || !this.notifFormModel.message) {
       alert('Please select a recipient and input a message');
       return;

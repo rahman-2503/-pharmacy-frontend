@@ -696,8 +696,10 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         // browser has dropped the user-gesture and will block an auto-opened
         // popup. Instead of auto-opening (which would be blocked), store the
         // Razorpay instance so openPendingRazorpay() can open it on real user click.
-        // Keep processingPayment true so the loader stays visible until user completes payment.
+        // Hide the loader overlay so the user can see and click the manual payment button.
         this.showPayButton = true;
+        this.processingPayment = false;
+        this.processingLabel = '';
         this.showMessage('Orders placed. Complete your payment to confirm.', 'success');
       } else {
         // Single-order payment is invoked synchronously from a click, so the

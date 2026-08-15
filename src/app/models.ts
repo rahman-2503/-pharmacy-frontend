@@ -7,6 +7,7 @@ export interface User {
   password?: string;
   role: 'doctor' | 'admin' | 'DOCTOR' | 'ADMIN';
   token?: string; // JWT token string
+  status?: string;
 }
 
 export interface Drug {
