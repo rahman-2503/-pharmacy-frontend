@@ -48,8 +48,8 @@ export class LoginComponent implements OnInit {
     this.route.queryParams.subscribe(params => {
       if (params['role'] === 'admin') {
         this.loginRole = 'admin';
-        this.loginData.email = 'admin@pharmacy.com';
-        this.loginData.password = 'Admin@123';
+        this.loginData.email = 'admin@gmail.com';
+        this.loginData.password = 'admin@123';
       } else {
         this.loginRole = 'doctor';
         this.loginData.email = '';
@@ -74,8 +74,8 @@ export class LoginComponent implements OnInit {
     this.loginRole = role;
     this.loginError = null;
     if (role === 'admin') {
-      this.loginData.email = 'admin@pharmacy.com';
-      this.loginData.password = 'Admin@123';
+      this.loginData.email = 'admin@gmail.com';
+      this.loginData.password = 'admin@123';
     } else {
       this.loginData.email = '';
       this.loginData.password = '';
