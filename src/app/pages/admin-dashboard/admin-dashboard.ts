@@ -43,6 +43,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   doctorNameMap: { [userId: string]: string } = {};
   supplierMapAdmin: { [email: string]: string } = {};
 
+  // Toast message state
+  showToast = false;
+  message: string = '';
+  messageType: 'success' | 'error' = 'success';
+
   // Orders doctor filter dropdown
   selectedDoctorFilter: string = 'ALL';
 
@@ -543,8 +548,53 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  // --- Send Custom Notification ---
-  sendCustomNotif() {
+  // ✅ Block user (change status to BLOCKED)
+  blockUser(id: string) {
+    if (confirm('Are you sure you want to block this user?')) {
+      this.apiService.toggleUserStatus(id).subscribe({
+        next: () => {
+          this.loadUsers();
+          this.showMessage('User blocked successfully.', 'success');
+        },
+        error: (err) => {
+          console.error('Failed to block user', err);
+          this.showMessage('Failed to block user.', 'error');
+        }
+      });
+    }
+  }
+
+  // ✅ Unblock user (change status to ACTIVE)
+  unblockUser(id: string) {
+    if (confirm('Are you sure you want to unblock this user?')) {
+      this.apiService.toggleUserStatus(id).subscribe({
+        next: () => {
+          this.loadUsers();
+          this.showMessage('User unblocked successfully.', 'success');
+        },
+        error: (err) => {
+          console.error('Failed to unblock user', err);
+          this.showMessage('Failed to unblock user.', 'error');
+        }
+      });
+    }
+  }
+
+  // ✅ Delete user permanently
+  deleteUser(id: string) {
+    if (confirm('Are you sure you want to permanently delete this user?')) {
+      this.apiService.deleteUser(id).subscribe({
+        next: () => {
+          this.loadUsers();
+          this.showMessage('User deleted successfully.', 'success');
+        },
+        error: (err) => {
+          console.error('Failed to delete user', err);
+          this.showMessage('Failed to delete user.', 'error');
+        }
+      });
+    }
+  }
     if (!this.notifFormModel.userId || !this.notifFormModel.message) {
       alert('Please select a recipient and input a message');
       return;
@@ -685,5 +735,15 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   hasOrdersWithStatus(statuses: string[]): boolean {
     return this.filteredOrders.some(o => statuses.includes(o.status));
+  }
+
+  // ✅ Show toast message
+  showMessage(message: string, type: 'success' | 'error'): void {
+    this.message = message;
+    this.messageType = type;
+    this.showToast = true;
+    setTimeout(() => {
+      this.showToast = false;
+    }, 3000);
   }
 }
