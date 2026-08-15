@@ -1,11 +1,11 @@
 services:
   - type: web
     name: pharmacy-frontend
-    runtime: static
+    runtime: node
     repo: https://github.com/rahman-2503/-pharmacy-frontend
     branch: main
     buildCommand: npm install && npm run build
-    staticPublishPath: dist/pharmacare/browser
+    startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: 22.22.3
