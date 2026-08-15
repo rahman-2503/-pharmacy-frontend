@@ -538,7 +538,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         this.showMessage('Payment is taking longer than expected. If money was deducted, your order is being processed.', 'info');
         this.loadOrders(true);
       }
-    }, 25000);
+    }, 80000);
 
     const options = {
       key: 'rzp_test_SkUT7TYdihPuCN',
@@ -694,9 +694,9 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       if (isBulk) {
         // Bulk checkout reaches here after an async order-placement call, so the
         // browser has dropped the user-gesture and will block an auto-opened
-        // popup. Instead, surface a manual "Complete Payment" button.
-        this.processingPayment = false;
-        this.processingLabel = '';
+        // popup. Instead of auto-opening (which would be blocked), store the
+        // Razorpay instance so openPendingRazorpay() can open it on real user click.
+        // Keep processingPayment true so the loader stays visible until user completes payment.
         this.showPayButton = true;
         this.showMessage('Orders placed. Complete your payment to confirm.', 'success');
       } else {
@@ -731,7 +731,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         this.showMessage('Payment is taking longer than expected. If money was deducted, your order is being processed.', 'info');
         this.loadOrders(true);
       }
-    }, 25000);
+    }, 80000);
 
     try {
       this.pendingRzp.open();
