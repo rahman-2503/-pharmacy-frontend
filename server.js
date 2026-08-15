@@ -8,28 +8,25 @@ const DIST_DIR = path.join(__dirname, 'dist/pharmacare/browser');
 
 app.use(compression());
 
+// 1. Serve real static files (JS, CSS, images, fonts, etc.)
 app.use(express.static(DIST_DIR, {
+  index: false,
   maxAge: '1y',
   etag: true,
   lastModified: true,
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Cache-Control', 'no-cache');
     }
   }
 }));
 
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/assets') || req.path.includes('.')) {
-    return next();
-  }
-  res.sendFile(path.join(DIST_DIR, 'index.html'), (err) => {
-    if (err) {
-      res.status(500).send(err);
-    }
-  });
+// 2. SPA fallback: every non-file request gets index.html
+//    This is what makes /admin, /doctor, /login, etc. work on refresh.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(DIST_DIR, 'index.html'));
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Pharmacare SPA server running on port ${PORT}`);
 });
