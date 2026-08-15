@@ -8,6 +8,12 @@
       <button class="btn btn-outline btn-sm change-pass-btn" (click)="setSection('change-password')" style="margin-top: 12px; width: 100%;">🔑 Change Password</button>
     </div>
     
+    <!-- Toast placeholder -->
+    <div *ngIf="showToast" class="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 12px 24px; border-radius: 8px; font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,0.15); max-width: 400px; background: {{ messageType === 'success' ? '#d4edda' : '#f8d7da' }}; color: {{ messageType === 'success' ? '#155724' : '#721c24' }}; border: 1px solid {{ messageType === 'success' ? '#c3e6cb' : '#f5c6cb' }}">
+      <span style="font-weight: 600;">{{ message }}</span>
+      <button type="button" class="btn-close" aria-label="Close" (click)="showToast = false" style="margin-left: 12px; cursor: pointer; opacity: 0.5;"></button>
+    </div>
+    
     <nav class="sidebar-nav">
       <ul class="sidebar-nav-list">
         <li>
@@ -536,8 +542,10 @@
               <th>Doctor ID</th>
               <th>Name</th>
               <th>Email</th>
-              <th>Phone</th>
+              <th>Contact</th>
               <th>Role</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -547,12 +555,21 @@
               <td>{{ u.email }}</td>
               <td>{{ u.contact || 'N/A' }}</td>
               <td><span class="badge badge-info">{{ u.role || 'DOCTOR' }}</span></td>
-            </tr>
-            <tr *ngIf="!loadingUsers && allUsers.length === 0">
-              <td colspan="5" class="center-text">No doctors registered yet.</td>
+              <td>
+                <span *ngIf="u.status === 'ACTIVE'" class="badge badge-success">Active</span>
+                <span *ngIf="u.status === 'BLOCKED'" class="badge badge-danger">Blocked</span>
+              </td>
+              <td class="table-actions">
+                <button *ngIf="u.status === 'ACTIVE'" class="btn btn-secondary btn-sm" (click)="blockUser(u.id!)">Block</button>
+                <button *ngIf="u.status === 'BLOCKED'" class="btn btn-secondary btn-sm" (click)="unblockUser(u.id!)">Unblock</button>
+                <button class="btn btn-danger btn-sm" (click)="deleteUser(u.id!)">Delete</button>
+              </td>
             </tr>
             <tr *ngIf="loadingUsers">
-              <td colspan="5" class="center-text">Loading registered doctors…</td>
+              <td colspan="7" class="center-text">Loading registered doctors…</td>
+            </tr>
+            <tr *ngIf="!loadingUsers && allUsers.length === 0">
+              <td colspan="7" class="center-text">No doctors registered yet.</td>
             </tr>
           </tbody>
         </table>
