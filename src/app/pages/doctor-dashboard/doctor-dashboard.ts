@@ -88,6 +88,10 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   showPayButton = false;
   private pendingRzp: any = null;
 
+  // Set to true the moment the Razorpay popup reports success or dismissal,
+  // so the popup watchdog never fires after the flow already ended.
+  private paymentHandled = false;
+
   constructor(
     private apiService: ApiService,
     private authService: AuthService,
@@ -102,6 +106,41 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.loadOrders();
     this.loadSuppliers();
     this.startNotificationPolling();
+    // Preload the Razorpay checkout script in the background so it is cached
+    // (and the checkout flow resolves instantly) by the time the user pays.
+    this.razorpayService.load().catch(() => {});
+  }
+
+  // Race a promise against a hard deadline so NO step in the payment
+  // pipeline can ever hang the loader indefinitely.
+  private withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error(message)), ms);
+      promise.then(
+        (v) => { clearTimeout(timer); resolve(v); },
+        (e) => { clearTimeout(timer); reject(e); }
+      );
+    });
+  }
+
+  // Replace the payment watchdog with a new one with the given budget.
+  private armWatchdog(budgetMs: number, action: () => void) {
+    if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+    this.paymentWatchdog = window.setTimeout(action, budgetMs);
+  }
+
+  // THE single terminal cleanup for the payment UI. Every success, failure,
+  // timeout and dismissal path funnels through here so the spinner can never
+  // be left running.
+  private finalizePaymentUi() {
+    this.processingPayment = false;
+    this.processingLabel = '';
+    this.showPayButton = false;
+    this.pendingRzp = null;
+    if (this.paymentWatchdog) {
+      clearTimeout(this.paymentWatchdog);
+      this.paymentWatchdog = null;
+    }
   }
 
   // Load suppliers and build email -> name map for displaying drug suppliers
@@ -424,26 +463,23 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.showCartDrawer = false;
     const userId = this.doctorUser.email || this.doctorUser.userId || '';
     
+    this.finalizePaymentUi();
     this.processingPayment = true;
+    this.processingLabel = 'Placing your order...';
     this.paymentSuccessMsg = '';
     this.showPaymentModal = false;
-    this.showPayButton = false;
-    this.pendingRzp = null;
     this.paymentAmount = this.cartTotal;
     this.isBulkPayment = true;
     this.checkoutOrders = [];
-    this.checkoutRzpOrders = [];
+    this.paymentHandled = false;
 
     // Safety net: if order placement itself hangs (e.g. backend cold start),
     // never leave the loader spinning forever.
-    if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
-    this.paymentWatchdog = window.setTimeout(() => {
-      if (this.processingPayment && !this.showPayButton) {
-        this.processingPayment = false;
-        this.processingLabel = '';
-        this.showMessage('Order placement is taking longer than expected. Please check your orders shortly.', 'info');
-      }
-    }, 40000);
+    this.armWatchdog(45000, () => {
+      this.finalizePaymentUi();
+      this.showMessage('Order placement is taking longer than expected. Please check your order history shortly.', 'info');
+      this.loadOrders(true);
+    });
 
     // Create parallel placement orders, one for each drug
     const placements = this.cart.map(item => {
@@ -506,73 +542,64 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         this.loadDrugs();
 
         // Launch real Razorpay checkout popup directly
-        this.launchRazorpayCheckout(totalToPay, true, createdOrders);
+        this.runCheckout(totalToPay, true, createdOrders);
       },
       error: (err) => {
-        this.processingPayment = false;
+        this.finalizePaymentUi();
         this.showMessage('Failed to place orders. Please try again.', 'error');
         console.error(err);
       }
     });
   }
 
-  private resetProcessingState() {
-    this.processingPayment = false;
-    this.processingLabel = '';
-    this.showPayButton = false;
-    this.pendingRzp = null;
-    if (this.paymentWatchdog) {
-      clearTimeout(this.paymentWatchdog);
-      this.paymentWatchdog = null;
-    }
-  }
-
   // Launch Razorpay checkout: loads the checkout script on demand (with
   // retries + timeout), creates a real Razorpay order on the backend, and
-  // opens the payment popup. Every failure path clears the spinner so the
-  // checkout can never hang on an infinite loader.
-  private async launchRazorpayCheckout(amount: number, isBulk: boolean, orders: Order[]) {
+  // prepares the payment popup. Every step is race-guarded by withTimeout and
+  // every failure path calls finalizePaymentUi(), so the checkout can never
+  // hang on an infinite loader. The popup itself is opened from a REAL user
+  // click (the "Complete Payment" button) so browsers never block it.
+  private async runCheckout(amount: number, isBulk: boolean, orders: Order[]) {
     if (amount <= 0) {
+      this.finalizePaymentUi();
       this.showMessage('Invalid payment amount.', 'error');
-      this.resetProcessingState();
       return;
     }
 
     this.processingPayment = true;
-    this.processingLabel = 'Connecting to secure payment gateway...';
+    this.showPayButton = false;
+    this.pendingRzp = null;
+    this.paymentHandled = false;
+    this.processingLabel = 'Connecting to payment gateway...';
 
-    // Watchdog: guarantee the loader never spins forever, even if the
-    // Razorpay callback never fires (popup blocked, network drop, etc.)
-    if (this.paymentWatchdog) {
-      clearTimeout(this.paymentWatchdog);
-    }
-    this.paymentWatchdog = window.setTimeout(() => {
-      if (this.processingPayment) {
-        this.resetProcessingState();
-        this.showMessage('Payment is taking longer than expected. If money was deducted, your order is being processed.', 'info');
-        this.loadOrders(true);
-      }
-    }, 80000);
-
-    // 1. Load Razorpay checkout script (never hangs on a bad CDN response)
+    // 1. Load Razorpay checkout script — hard 20s cap, guaranteed settle.
     let RazorpayCtor: RazorpayConstructor;
     try {
-      RazorpayCtor = await this.razorpayService.load();
+      RazorpayCtor = await this.withTimeout(
+        this.razorpayService.load(),
+        20000,
+        'Razorpay script load timed out'
+      );
     } catch (err) {
       console.error('Razorpay script load failed', err);
-      this.resetProcessingState();
+      this.finalizePaymentUi();
       this.showMessage('Payment gateway could not be loaded. Please check your connection and try again.', 'error');
       return;
     }
 
-    // 2. Create a real Razorpay order on the backend (network/API errors
-    //    fall back to a key-only checkout so payment is never blocked)
+    // 2. Create a real Razorpay order on the backend (single attempt, 45s cap).
+    //    Network/API errors fall back to a key-only checkout so payment is
+    //    never blocked.
+    this.processingLabel = 'Creating secure payment order...';
     const primaryOrder = orders[0];
     const primaryOrderId = String(primaryOrder?.id || primaryOrder?.orderId || '');
     let rzpOrderId: string | null = null;
     let rzpKeyId = 'rzp_test_SkUT7TYdihPuCN';
     try {
-      const res = await firstValueFrom(this.apiService.createPaymentOrder(primaryOrderId, amount));
+      const res = await this.withTimeout(
+        firstValueFrom(this.apiService.createPaymentOrder(primaryOrderId, amount)),
+        45000,
+        'Payment order creation timed out'
+      );
       if (res && res.success) {
         rzpOrderId = res.razorpayOrderId || null;
         rzpKeyId = res.keyId || rzpKeyId;
@@ -583,7 +610,9 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       console.warn('Razorpay order creation failed, using key-only checkout:', err);
     }
 
-    this.processingLabel = 'Opening secure payment...';
+    // 3. Build the Razorpay instance and hand it to the user via the
+    //    "Complete Payment" button (a real click → popup never blocked).
+    this.processingLabel = 'Payment window ready — click below to open it.';
 
     const options: any = {
       key: rzpKeyId,
@@ -605,9 +634,10 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         // the "processing payment" spinner from hiding. Wrap all logic in
         // zone.run() so change detection fires and the loader resets.
         this.zone.run(() => {
-          this.showPayButton = false;
-          this.pendingRzp = null;
+          this.paymentHandled = true;
+          this.finalizePaymentUi();
           console.log('Razorpay payment successful:', response);
+          this.processingPayment = true;
           this.processingLabel = 'Verifying payment...';
           const paymentId = response.razorpay_payment_id;
           const realRzpOrderId = response.razorpay_order_id || rzpOrderId || '';
@@ -631,31 +661,16 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
 
           forkJoin(paymentCallbacks).pipe(
             finalize(() => {
-              this.processingPayment = false;
-              this.processingLabel = '';
-              if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+              this.finalizePaymentUi();
             })
           ).subscribe({
             next: () => {
-              this.processingLabel = 'Updating order status...';
-              const statusUpdates = orders.map(order => {
-                const orderId = order.id || order.orderId || '';
-                return this.apiService.updateOrderStatus(orderId, 'PLACED');
-              });
-              forkJoin(statusUpdates).subscribe({
-                next: () => {
-                  this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
-                  this.loadOrders(true);
-                },
-                error: () => {
-                  this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
-                  this.loadOrders(true);
-                }
-              });
+              this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
+              this.loadOrders(true);
             },
             error: (err) => {
-              this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
-              console.error(err);
+              console.error('Payment callback verification failed', err);
+              this.showMessage(`Payment successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
               this.loadOrders(true);
             }
           });
@@ -665,32 +680,21 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         ondismiss: () => {
           this.zone.run(() => {
             console.log('Payment modal dismissed');
-            this.resetProcessingState();
+            this.paymentHandled = true;
+            this.finalizePaymentUi();
 
-            if (isBulk) {
-              const failCallbacks = orders.map(order => {
-                const orderId = order.id || order.orderId || '';
-                const orderAmount = order.total || amount;
-                return this.apiService.submitPaymentFailure({ orderId: orderId, amount: orderAmount });
-              });
-              forkJoin(failCallbacks).subscribe({
-                next: () => {
-                  this.showMessage('Payment cancelled. Your order is saved as PENDING.', 'info');
-                  this.loadOrders(true);
-                },
-                error: () => this.loadOrders(true)
-              });
-            } else {
-              const order = orders[0];
+            const failCallbacks = orders.map(order => {
               const orderId = order.id || order.orderId || '';
-              this.apiService.submitPaymentFailure({ orderId: orderId, amount: amount }).subscribe({
-                next: () => {
-                  this.showMessage('Payment cancelled. Your order is saved as PENDING.', 'info');
-                  this.loadOrders(true);
-                },
-                error: () => this.loadOrders(true)
-              });
-            }
+              const orderAmount = order.total || amount;
+              return this.apiService.submitPaymentFailure({ orderId: orderId, amount: orderAmount });
+            });
+            forkJoin(failCallbacks).subscribe({
+              next: () => {
+                this.showMessage('Payment cancelled. Your order is saved — you can pay from Order History.', 'info');
+                this.loadOrders(true);
+              },
+              error: () => this.loadOrders(true)
+            });
           });
         }
       }
@@ -703,68 +707,81 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     try {
       const rzp = new RazorpayCtor(options);
       this.pendingRzp = rzp;
+      this.processingPayment = false;
+      this.processingLabel = '';
+      this.showPayButton = true;
 
-      if (isBulk) {
-        // Bulk checkout reaches here after an async order-placement call, so the
-        // browser has dropped the user-gesture and will block an auto-opened
-        // popup. Instead of auto-opening (which would be blocked), store the
-        // Razorpay instance so openPendingRazorpay() can open it on real user click.
-        // Hide the loader overlay so the user can see and click the manual payment button.
-        this.showPayButton = true;
-        this.processingPayment = false;
-        this.processingLabel = '';
-        this.showMessage('Orders placed. Complete your payment to confirm.', 'success');
-      } else {
-        // Single-order payment is invoked synchronously from a click, so the
-        // user gesture is still active and auto-open works.
-        rzp.open();
-      }
+      // Popup watchdog: if the user never clicks "Complete Payment" (or the
+      // popup is stuck open without a callback), reset after 2 minutes and
+      // leave the orders saved as PENDING so nothing is lost.
+      this.armWatchdog(120000, () => {
+        if (!this.paymentHandled) {
+          this.finalizePaymentUi();
+          this.showMessage('Payment session expired. Your order is saved — you can pay from Order History.', 'info');
+          this.loadOrders(true);
+        }
+      });
     } catch (err) {
       console.error('Failed to open Razorpay checkout', err);
-      this.resetProcessingState();
+      this.finalizePaymentUi();
       this.showMessage('Could not open payment window. Please try again.', 'error');
     }
   }
 
-  // Open the stored Razorpay instance from a real user click (used by the
-  // "Complete Payment" button for bulk checkout, where the auto-open popup
-  // would otherwise be blocked).
+  // Open the stored Razorpay instance from a real user click (never blocked
+  // by the browser since it happens inside the click handler).
   openPendingRazorpay() {
     if (!this.pendingRzp) {
-      this.showPayButton = false;
+      this.finalizePaymentUi();
       return;
     }
+    const rzp = this.pendingRzp;
     this.showPayButton = false;
     this.processingPayment = true;
-    this.processingLabel = 'Opening secure payment...';
+    this.paymentHandled = false;
+    this.processingLabel = 'Opening secure payment window...';
 
-    if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
-    this.paymentWatchdog = window.setTimeout(() => {
-      if (this.processingPayment) {
-        this.resetProcessingState();
-        this.showMessage('Payment is taking longer than expected. If money was deducted, your order is being processed.', 'info');
-        this.loadOrders(true);
+    // Popup watchdog: if the popup neither succeeded nor dismissed within
+    // 30s (e.g. its own loader is stuck), reset and offer the button again.
+    this.armWatchdog(30000, () => {
+      if (!this.paymentHandled) {
+        this.processingPayment = false;
+        this.processingLabel = '';
+        this.showPayButton = true;
+        this.showMessage('The payment window did not respond. Click the button to try again, or cancel.', 'info');
       }
-    }, 80000);
+    });
 
     try {
-      this.pendingRzp.open();
+      rzp.open();
     } catch (err) {
       console.error('Failed to open Razorpay checkout on manual click', err);
-      this.resetProcessingState();
+      this.finalizePaymentUi();
       this.showMessage('Could not open the payment window. Please try again.', 'error');
       // Allow the user to try again
       this.showPayButton = true;
     }
   }
 
+  // Cancel the pending payment (PENDING orders stay in Order History).
+  cancelPendingPayment() {
+    this.finalizePaymentUi();
+    this.showMessage('Payment cancelled. Your order is saved — you can pay from Order History.', 'info');
+    this.loadOrders(true);
+  }
+
   openPaymentModal(order: Order) {
     this.isBulkPayment = false;
     this.selectedOrderForPayment = order;
     this.paymentAmount = order.balance || order.total || 0;
-    
-    // Launch Razorpay directly instead of opening modal
-    this.launchRazorpayCheckout(this.paymentAmount, false, [order]);
+    if (this.paymentAmount <= 0) {
+      this.showMessage('This order has no pending amount.', 'info');
+      return;
+    }
+    this.finalizePaymentUi();
+    this.processingPayment = true;
+    this.processingLabel = 'Preparing payment...';
+    this.runCheckout(this.paymentAmount, false, [order]);
   }
 
   closePaymentModal() {

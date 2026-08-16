@@ -20,9 +20,13 @@ export class RazorpayService {
 
   // Dynamically loads the Razorpay checkout script with retries and a hard
   // timeout, so checkout never hangs forever when the CDN is slow/unreachable.
+  // A rejected load is NOT cached, so the next checkout attempt can retry.
   load(): Promise<RazorpayConstructor> {
     if (!this.loadPromise) {
-      this.loadPromise = this.loadScript();
+      this.loadPromise = this.loadScript().catch((err: Error) => {
+        this.loadPromise = null;
+        throw err;
+      });
     }
     return this.loadPromise;
   }
@@ -36,24 +40,35 @@ export class RazorpayService {
         }
 
         const existing = document.querySelector(`script[src="${SCRIPT_URL}"]`) as HTMLScriptElement | null;
-        if (!existing) {
-          const script = document.createElement('script');
-          script.src = SCRIPT_URL;
-          script.async = true;
-          script.id = 'razorpay-checkout-js';
-          script.onload = () => {
-            if (typeof (window as any).Razorpay === 'function') {
-              resolve((window as any).Razorpay as RazorpayConstructor);
-            } else {
-              retryOrFail(remaining, 'Script loaded but Razorpay is not defined');
-            }
-          };
-          script.onerror = () => retryOrFail(remaining, 'Script failed to load');
-          document.head.appendChild(script);
-        } else {
-          // Script tag exists but Razorpay is not defined yet — wait and retry.
+        if (existing && !existing.dataset['failed']) {
+          // Script tag exists and hasn't failed yet — give it a moment.
           window.setTimeout(() => retryOrFail(remaining, 'Razorpay not ready'), RETRY_DELAY_MS);
+          return;
         }
+
+        // Remove any previously failed script element so the retry actually
+        // re-fetches the CDN instead of waiting forever on a dead tag.
+        if (existing) {
+          existing.remove();
+        }
+
+        const script = document.createElement('script');
+        script.src = SCRIPT_URL;
+        script.async = true;
+        script.id = 'razorpay-checkout-js';
+        script.onload = () => {
+          if (typeof (window as any).Razorpay === 'function') {
+            resolve((window as any).Razorpay as RazorpayConstructor);
+          } else {
+            script.dataset['failed'] = '1';
+            retryOrFail(remaining, 'Script loaded but Razorpay is not defined');
+          }
+        };
+        script.onerror = () => {
+          script.dataset['failed'] = '1';
+          retryOrFail(remaining, 'Script failed to load');
+        };
+        document.head.appendChild(script);
       };
 
       const retryOrFail = (remaining: number, reason: string) => {

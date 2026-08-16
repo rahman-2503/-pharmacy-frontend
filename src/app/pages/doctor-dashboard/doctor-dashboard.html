@@ -311,10 +311,13 @@
     <div style="font-size: 40px; text-align: center;">💳</div>
     <h3 style="margin-top: 8px; font-size: 18px; font-weight: 700; text-align: center;">Complete Your Payment</h3>
     <p style="font-size: 13px; color: var(--text-muted); margin-top: 8px; text-align: center;">
-      Your orders have been placed. Click below to open the secure Razorpay checkout and finish payment.
+      Your order is ready. Click below to open the secure Razorpay checkout and finish payment.
     </p>
     <button class="btn btn-primary" (click)="openPendingRazorpay()" style="margin-top: 18px; width: 100%; font-size: 15px; padding: 12px;">
       Pay ₹{{ paymentAmount }} via Razorpay
+    </button>
+    <button class="btn" (click)="cancelPendingPayment()" style="margin-top: 10px; width: 100%; font-size: 14px; padding: 10px; background: none; color: var(--text-muted); border: 1px solid var(--border-color);">
+      Cancel
     </button>
   </div>
 </div>

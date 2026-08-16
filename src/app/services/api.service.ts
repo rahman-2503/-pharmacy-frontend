@@ -410,8 +410,7 @@ export class ApiService {
       quantity: order.quantity
     };
     return this.http.post<any>(`${this.baseUrl}/orders`, payload, { headers: this.getHeaders() }).pipe(
-      timeout(90000),
-      retry(1),
+      timeout(45000),
       map(o => this.mapBackendOrderToFrontend(o))
     );
   }
@@ -439,8 +438,7 @@ export class ApiService {
       headers: this.getHeaders(),
       responseType: 'text'
     }).pipe(
-      timeout(90000),
-      retry(1),
+      timeout(45000),
       map(res => JSON.parse(res))
     );
   }
