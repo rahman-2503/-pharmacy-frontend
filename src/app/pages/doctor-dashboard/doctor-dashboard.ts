@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
@@ -61,7 +61,11 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   private showMessage(msg: string, type: 'success' | 'error' | 'info' = 'info') {
     this.message = msg;
     this.messageType = type;
-    setTimeout(() => this.message = null, 6000);
+    this.cd();
+    setTimeout(() => {
+      this.message = null;
+      this.cd();
+    }, 6000);
   }
 
   // Chart references
@@ -96,8 +100,17 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     private apiService: ApiService,
     private authService: AuthService,
     private razorpayService: RazorpayService,
-    private zone: NgZone
+    private zone: NgZone,
+    private cdr: ChangeDetectorRef
   ) {}
+
+  // This app runs zoneless (no zone.js), so change detection does NOT run
+  // after async callbacks (HTTP, promises, timers). Every async state
+  // mutation in the payment flow calls cd() to force a render — otherwise
+  // the "processing payment" loader stays frozen forever.
+  private cd() {
+    try { this.cdr.detectChanges(); } catch (e) { /* view already destroyed */ }
+  }
 
   ngOnInit() {
     this.doctorUser = this.authService.getCurrentUser();
@@ -154,6 +167,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           if (key) map[key] = s.name;
         });
         this.supplierMap = map;
+        this.cd();
       },
       error: (err) => console.error('Failed to load suppliers', err)
     });
@@ -352,6 +366,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           this.drugsLoaded = true;
         }
         this.loadingDrugs = false;
+        this.cd();
       },
       error: (err) => {
         console.error('Failed to load drugs', err);
@@ -359,6 +374,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         // will attempt to fetch again instead of showing empty forever.
         this.drugsLoadError = true;
         this.loadingDrugs = false;
+        this.cd();
       }
     });
   }
@@ -384,6 +400,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           });
           this.loadingOrders = false;
           this.persistCache();
+          this.cd();
           if (this.currentSection === 'dashboard') {
             setTimeout(() => this.initCharts(), 100);
           }
@@ -391,6 +408,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         error: (err) => {
           console.error('Failed to load orders', err);
           this.loadingOrders = false;
+          this.cd();
         }
       });
     }
@@ -472,11 +490,13 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.isBulkPayment = true;
     this.checkoutOrders = [];
     this.paymentHandled = false;
+    this.cd();
 
     // Safety net: if order placement itself hangs (e.g. backend cold start),
     // never leave the loader spinning forever.
     this.armWatchdog(45000, () => {
       this.finalizePaymentUi();
+      this.cd();
       this.showMessage('Order placement is taking longer than expected. Please check your order history shortly.', 'info');
       this.loadOrders(true);
     });
@@ -540,12 +560,14 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         this.cart = [];
         this.cartTotal = 0;
         this.loadDrugs();
+        this.cd();
 
         // Launch real Razorpay checkout popup directly
         this.runCheckout(totalToPay, true, createdOrders);
       },
       error: (err) => {
         this.finalizePaymentUi();
+        this.cd();
         this.showMessage('Failed to place orders. Please try again.', 'error');
         console.error(err);
       }
@@ -570,6 +592,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.pendingRzp = null;
     this.paymentHandled = false;
     this.processingLabel = 'Connecting to payment gateway...';
+    this.cd();
 
     // 1. Load Razorpay checkout script — hard 20s cap, guaranteed settle.
     let RazorpayCtor: RazorpayConstructor;
@@ -582,14 +605,17 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.error('Razorpay script load failed', err);
       this.finalizePaymentUi();
+      this.cd();
       this.showMessage('Payment gateway could not be loaded. Please check your connection and try again.', 'error');
       return;
     }
+    this.cd();
 
     // 2. Create a real Razorpay order on the backend (single attempt, 45s cap).
     //    Network/API errors fall back to a key-only checkout so payment is
     //    never blocked.
     this.processingLabel = 'Creating secure payment order...';
+    this.cd();
     const primaryOrder = orders[0];
     const primaryOrderId = String(primaryOrder?.id || primaryOrder?.orderId || '');
     let rzpOrderId: string | null = null;
@@ -609,10 +635,12 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.warn('Razorpay order creation failed, using key-only checkout:', err);
     }
+    this.cd();
 
     // 3. Build the Razorpay instance and hand it to the user via the
     //    "Complete Payment" button (a real click → popup never blocked).
     this.processingLabel = 'Payment window ready — click below to open it.';
+    this.cd();
 
     const options: any = {
       key: rzpKeyId,
@@ -636,9 +664,11 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         this.zone.run(() => {
           this.paymentHandled = true;
           this.finalizePaymentUi();
+          this.cd();
           console.log('Razorpay payment successful:', response);
           this.processingPayment = true;
           this.processingLabel = 'Verifying payment...';
+          this.cd();
           const paymentId = response.razorpay_payment_id;
           const realRzpOrderId = response.razorpay_order_id || rzpOrderId || '';
           const realSignature = response.razorpay_signature || '';
@@ -662,6 +692,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           forkJoin(paymentCallbacks).pipe(
             finalize(() => {
               this.finalizePaymentUi();
+              this.cd();
             })
           ).subscribe({
             next: () => {
@@ -682,6 +713,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
             console.log('Payment modal dismissed');
             this.paymentHandled = true;
             this.finalizePaymentUi();
+            this.cd();
 
             const failCallbacks = orders.map(order => {
               const orderId = order.id || order.orderId || '';
@@ -710,6 +742,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       this.processingPayment = false;
       this.processingLabel = '';
       this.showPayButton = true;
+      this.cd();
 
       // Popup watchdog: if the user never clicks "Complete Payment" (or the
       // popup is stuck open without a callback), reset after 2 minutes and
@@ -717,13 +750,28 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       this.armWatchdog(120000, () => {
         if (!this.paymentHandled) {
           this.finalizePaymentUi();
+          this.cd();
           this.showMessage('Payment session expired. Your order is saved — you can pay from Order History.', 'info');
           this.loadOrders(true);
         }
       });
+
+      // Bonus: attempt an auto-open. Browsers that still allow the popup
+      // (permissive settings) will show it immediately — browsers that
+      // block it keep the "Complete Payment" button as the reliable path.
+      setTimeout(() => {
+        if (!this.paymentHandled && this.pendingRzp) {
+          try {
+            this.pendingRzp.open();
+          } catch (e) {
+            console.warn('Auto-open popup blocked or failed; pay button remains available', e);
+          }
+        }
+      }, 400);
     } catch (err) {
       console.error('Failed to open Razorpay checkout', err);
       this.finalizePaymentUi();
+      this.cd();
       this.showMessage('Could not open payment window. Please try again.', 'error');
     }
   }
@@ -733,6 +781,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   openPendingRazorpay() {
     if (!this.pendingRzp) {
       this.finalizePaymentUi();
+      this.cd();
       return;
     }
     const rzp = this.pendingRzp;
@@ -740,6 +789,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.processingPayment = true;
     this.paymentHandled = false;
     this.processingLabel = 'Opening secure payment window...';
+    this.cd();
 
     // Popup watchdog: if the popup neither succeeded nor dismissed within
     // 30s (e.g. its own loader is stuck), reset and offer the button again.
@@ -748,6 +798,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         this.processingPayment = false;
         this.processingLabel = '';
         this.showPayButton = true;
+        this.cd();
         this.showMessage('The payment window did not respond. Click the button to try again, or cancel.', 'info');
       }
     });
@@ -757,15 +808,18 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.error('Failed to open Razorpay checkout on manual click', err);
       this.finalizePaymentUi();
+      this.cd();
       this.showMessage('Could not open the payment window. Please try again.', 'error');
       // Allow the user to try again
       this.showPayButton = true;
+      this.cd();
     }
   }
 
   // Cancel the pending payment (PENDING orders stay in Order History).
   cancelPendingPayment() {
     this.finalizePaymentUi();
+    this.cd();
     this.showMessage('Payment cancelled. Your order is saved — you can pay from Order History.', 'info');
     this.loadOrders(true);
   }
@@ -781,6 +835,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.finalizePaymentUi();
     this.processingPayment = true;
     this.processingLabel = 'Preparing payment...';
+    this.cd();
     this.runCheckout(this.paymentAmount, false, [order]);
   }
 
