@@ -6,6 +6,9 @@ services:
     branch: main
     buildCommand: npm install && npm run build
     startCommand: npm start
+    region: oregon
+    plan: free
+    healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: 22.22.3

@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://api-gateway-xysq.onrender.com'
+  apiUrl: 'https://api-gateway-dbuu.onrender.com'
 };

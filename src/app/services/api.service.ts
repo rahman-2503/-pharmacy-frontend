@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, forkJoin, of, from, BehaviorSubject, timer, throwError } from 'rxjs';
+import { Observable, forkJoin, of, BehaviorSubject, timer, throwError } from 'rxjs';
 import { map, switchMap, catchError, filter, timeout, retry } from 'rxjs/operators';
 import { User, Drug, Supplier, Order, SalesReport, Notification, OrderStatus } from '../models';
 import { environment } from '../../environments/environment';
@@ -445,43 +445,12 @@ export class ApiService {
     );
   }
 
-  // Native HMAC-SHA256 implementation using Web Crypto API to sign payment requests
-  private async calculateHmacSHA256(message: string, secret: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(secret);
-    const messageData = encoder.encode(message);
-    
-    const cryptoKey = await window.crypto.subtle.importKey(
-      'raw',
-      keyData,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
-    
-    const signatureBuffer = await window.crypto.subtle.sign(
-      'HMAC',
-      cryptoKey,
-      messageData
-    );
-    
-    const signatureArray = Array.from(new Uint8Array(signatureBuffer));
-    return signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
   public submitPaymentSuccess(paymentDetails: { orderId: string; amount: number; paymentId: string; signature: string; razorpayOrderId: string }): Observable<any> {
-    const secret = 'V6C0KvJ3x5g4df05mafrZVbq'; // Razorpay key.secret from application.properties
-    const message = `${paymentDetails.razorpayOrderId}|${paymentDetails.paymentId}`;
-
-    return from(this.calculateHmacSHA256(message, secret)).pipe(
-      switchMap(realSignature => {
-        const roundedAmount = Math.round(paymentDetails.amount || 0);
-        const params = `?orderId=${paymentDetails.orderId}&amount=${roundedAmount}&paymentId=${paymentDetails.paymentId}&signature=${realSignature}&razorpayOrderId=${paymentDetails.razorpayOrderId}`;
-        return this.http.post<any>(`${this.baseUrl}/payment/success${params}`, {}, { headers: this.getHeaders() }).pipe(
-          timeout(30000),
-          retry(1)
-        );
-      })
+    const roundedAmount = Math.round(paymentDetails.amount || 0);
+    const params = `?orderId=${paymentDetails.orderId}&amount=${roundedAmount}&paymentId=${encodeURIComponent(paymentDetails.paymentId)}&signature=${encodeURIComponent(paymentDetails.signature)}&razorpayOrderId=${encodeURIComponent(paymentDetails.razorpayOrderId)}`;
+    return this.http.post<any>(`${this.baseUrl}/payment/success${params}`, {}, { headers: this.getHeaders() }).pipe(
+      timeout(30000),
+      retry(1)
     );
   }
 

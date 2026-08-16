@@ -3,12 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { RazorpayService, RazorpayConstructor } from '../../services/razorpay.service';
 import { Drug, Order, User, OrderStatus, Notification, Supplier } from '../../models';
-import { forkJoin, Subscription, interval, Subject, of } from 'rxjs';
+import { forkJoin, Subscription, interval, Subject, of, firstValueFrom, Observable } from 'rxjs';
 import { startWith, switchMap, takeUntil, finalize, catchError } from 'rxjs/operators';
 import Chart from 'chart.js/auto';
-
-declare var Razorpay: any;
 
 interface CartItem {
   drug: Drug;
@@ -92,6 +91,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   constructor(
     private apiService: ApiService,
     private authService: AuthService,
+    private razorpayService: RazorpayService,
     private zone: NgZone
   ) {}
 
@@ -516,15 +516,30 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  launchRazorpayCheckout(amount: number, isBulk: boolean, orders: Order[]) {
+  private resetProcessingState() {
+    this.processingPayment = false;
+    this.processingLabel = '';
+    this.showPayButton = false;
+    this.pendingRzp = null;
+    if (this.paymentWatchdog) {
+      clearTimeout(this.paymentWatchdog);
+      this.paymentWatchdog = null;
+    }
+  }
+
+  // Launch Razorpay checkout: loads the checkout script on demand (with
+  // retries + timeout), creates a real Razorpay order on the backend, and
+  // opens the payment popup. Every failure path clears the spinner so the
+  // checkout can never hang on an infinite loader.
+  private async launchRazorpayCheckout(amount: number, isBulk: boolean, orders: Order[]) {
     if (amount <= 0) {
       this.showMessage('Invalid payment amount.', 'error');
-      this.processingPayment = false;
+      this.resetProcessingState();
       return;
     }
 
     this.processingPayment = true;
-    this.processingLabel = 'Opening secure payment...';
+    this.processingLabel = 'Connecting to secure payment gateway...';
 
     // Watchdog: guarantee the loader never spins forever, even if the
     // Razorpay callback never fires (popup blocked, network drop, etc.)
@@ -533,20 +548,58 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     }
     this.paymentWatchdog = window.setTimeout(() => {
       if (this.processingPayment) {
-        this.processingPayment = false;
-        this.processingLabel = '';
+        this.resetProcessingState();
         this.showMessage('Payment is taking longer than expected. If money was deducted, your order is being processed.', 'info');
         this.loadOrders(true);
       }
     }, 80000);
 
-    const options = {
-      key: 'rzp_test_SkUT7TYdihPuCN',
+    // 1. Load Razorpay checkout script (never hangs on a bad CDN response)
+    let RazorpayCtor: RazorpayConstructor;
+    try {
+      RazorpayCtor = await this.razorpayService.load();
+    } catch (err) {
+      console.error('Razorpay script load failed', err);
+      this.resetProcessingState();
+      this.showMessage('Payment gateway could not be loaded. Please check your connection and try again.', 'error');
+      return;
+    }
+
+    // 2. Create a real Razorpay order on the backend (network/API errors
+    //    fall back to a key-only checkout so payment is never blocked)
+    const primaryOrder = orders[0];
+    const primaryOrderId = String(primaryOrder?.id || primaryOrder?.orderId || '');
+    let rzpOrderId: string | null = null;
+    let rzpKeyId = 'rzp_test_SkUT7TYdihPuCN';
+    try {
+      const res = await firstValueFrom(this.apiService.createPaymentOrder(primaryOrderId, amount));
+      if (res && res.success) {
+        rzpOrderId = res.razorpayOrderId || null;
+        rzpKeyId = res.keyId || rzpKeyId;
+      } else {
+        console.warn('Razorpay order creation did not succeed, using key-only checkout:', res);
+      }
+    } catch (err) {
+      console.warn('Razorpay order creation failed, using key-only checkout:', err);
+    }
+
+    this.processingLabel = 'Opening secure payment...';
+
+    const options: any = {
+      key: rzpKeyId,
       amount: Math.round(amount * 100), // in paise
       currency: 'INR',
       name: 'Pharmacare Pharmacy',
       description: isBulk ? 'Bulk Order Payment' : 'Order Payment',
       image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=100&q=80',
+      prefill: {
+        name: this.doctorUser?.name || '',
+        email: this.doctorUser?.email || '',
+        contact: this.doctorUser?.contact || ''
+      },
+      theme: {
+        color: '#2563eb'
+      },
       handler: (response: any) => {
         // Razorpay runs this callback outside Angular's zone, which prevents
         // the "processing payment" spinner from hiding. Wrap all logic in
@@ -557,114 +610,69 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           console.log('Razorpay payment successful:', response);
           this.processingLabel = 'Verifying payment...';
           const paymentId = response.razorpay_payment_id;
+          const realRzpOrderId = response.razorpay_order_id || rzpOrderId || '';
+          const realSignature = response.razorpay_signature || '';
 
-          if (isBulk) {
-            const paymentCallbacks = orders.map(order => {
-              const orderId = order.id || order.orderId || '';
-              const orderAmount = order.total || 0;
-              const dummyRzpOrderId = 'order_bulk_' + orderId + '_' + Math.random().toString(36).substring(2, 7);
-              return this.apiService.submitPaymentSuccess({
-                orderId: orderId,
-                amount: orderAmount,
-                paymentId: paymentId,
-                signature: '',
-                razorpayOrderId: dummyRzpOrderId
-              });
-            });
-
-            forkJoin(paymentCallbacks).pipe(
-        finalize(() => {
-          this.processingPayment = false;
-          this.processingLabel = '';
-          if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
-        })
-            ).subscribe({
-              next: () => {
-                this.processingLabel = 'Updating order status...';
-                const statusUpdates = orders.map(order => {
-                  const orderId = order.id || order.orderId || '';
-                  return this.apiService.updateOrderStatus(orderId, 'PLACED');
-                });
-                forkJoin(statusUpdates).subscribe({
-                  next: () => {
-                    this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
-                    this.loadOrders(true);
-                  },
-                  error: () => {
-                    this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
-                    this.loadOrders(true);
-                  }
-                });
-              },
-              error: (err) => {
-                this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
-                console.error(err);
-                this.loadOrders(true);
-              }
-            });
-          } else {
-            const order = orders[0];
+          const submitForOrder = (order: Order): Observable<any> => {
             const orderId = order.id || order.orderId || '';
-            const dummyRzpOrderId = 'order_' + orderId + '_' + Math.random().toString(36).substring(2, 7);
-
-            this.apiService.submitPaymentSuccess({
+            const orderAmount = order.total || amount;
+            return this.apiService.submitPaymentSuccess({
               orderId: orderId,
-              amount: amount,
+              amount: orderAmount,
               paymentId: paymentId,
-              signature: '',
-              razorpayOrderId: dummyRzpOrderId
-            }).pipe(
-        finalize(() => {
-          this.processingPayment = false;
-          this.processingLabel = '';
-          if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
-        })
-            ).subscribe({
-              next: () => {
-                this.processingLabel = 'Updating order status...';
-                this.apiService.updateOrderStatus(orderId, 'PLACED').subscribe({
-                  next: () => {
-                    this.showMessage(`Payment successful! Payment ID: ${paymentId}`, 'success');
-                    this.loadOrders(true);
-                  },
-                  error: () => {
-                    this.showMessage(`Payment successful! Payment ID: ${paymentId}`, 'success');
-                    this.loadOrders(true);
-                  }
-                });
-              },
-              error: (err) => {
-                this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
-                console.error(err);
-                this.loadOrders(true);
-              }
+              signature: realSignature,
+              razorpayOrderId: realRzpOrderId
             });
-          }
+          };
+
+          const paymentCallbacks = isBulk
+            ? orders.map(o => submitForOrder(o))
+            : [submitForOrder(orders[0])];
+
+          forkJoin(paymentCallbacks).pipe(
+            finalize(() => {
+              this.processingPayment = false;
+              this.processingLabel = '';
+              if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+            })
+          ).subscribe({
+            next: () => {
+              this.processingLabel = 'Updating order status...';
+              const statusUpdates = orders.map(order => {
+                const orderId = order.id || order.orderId || '';
+                return this.apiService.updateOrderStatus(orderId, 'PLACED');
+              });
+              forkJoin(statusUpdates).subscribe({
+                next: () => {
+                  this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
+                  this.loadOrders(true);
+                },
+                error: () => {
+                  this.showMessage(`Checkout successful! Total Paid: ₹${amount}. Payment ID: ${paymentId}`, 'success');
+                  this.loadOrders(true);
+                }
+              });
+            },
+            error: (err) => {
+              this.showMessage('Payment callback verification failed. Your order may still be pending.', 'error');
+              console.error(err);
+              this.loadOrders(true);
+            }
+          });
         });
-      },
-      prefill: {
-        name: this.doctorUser?.name || '',
-        email: this.doctorUser?.email || '',
-        contact: this.doctorUser?.contact || ''
-      },
-      theme: {
-        color: '#2563eb'
       },
       modal: {
         ondismiss: () => {
-          this.showPayButton = false;
-          this.pendingRzp = null;
-          console.log('Payment modal dismissed');
-          this.processingPayment = false;
-          this.processingLabel = '';
-          if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
-          
-          if (isBulk) {
-            const failCallbacks = orders.map(order => {
-              const orderId = order.id || order.orderId || '';
-              const orderAmount = order.total || 0;
-              return this.apiService.submitPaymentFailure({ orderId: orderId, amount: orderAmount });
-            });
+          this.zone.run(() => {
+            console.log('Payment modal dismissed');
+            this.resetProcessingState();
+
+            if (isBulk) {
+              const failCallbacks = orders.map(order => {
+                const orderId = order.id || order.orderId || '';
+                const orderAmount = order.total || amount;
+                return this.apiService.submitPaymentFailure({ orderId: orderId, amount: orderAmount });
+              });
               forkJoin(failCallbacks).subscribe({
                 next: () => {
                   this.showMessage('Payment cancelled. Your order is saved as PENDING.', 'info');
@@ -683,12 +691,17 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
                 error: () => this.loadOrders(true)
               });
             }
+          });
         }
       }
     };
 
+    if (rzpOrderId) {
+      options.order_id = rzpOrderId;
+    }
+
     try {
-      const rzp = new Razorpay(options);
+      const rzp = new RazorpayCtor(options);
       this.pendingRzp = rzp;
 
       if (isBulk) {
@@ -708,10 +721,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Failed to open Razorpay checkout', err);
-      this.processingPayment = false;
-      this.processingLabel = '';
-      this.showPayButton = false;
-      if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+      this.resetProcessingState();
       this.showMessage('Could not open payment window. Please try again.', 'error');
     }
   }
@@ -720,7 +730,10 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   // "Complete Payment" button for bulk checkout, where the auto-open popup
   // would otherwise be blocked).
   openPendingRazorpay() {
-    if (!this.pendingRzp) return;
+    if (!this.pendingRzp) {
+      this.showPayButton = false;
+      return;
+    }
     this.showPayButton = false;
     this.processingPayment = true;
     this.processingLabel = 'Opening secure payment...';
@@ -728,8 +741,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
     this.paymentWatchdog = window.setTimeout(() => {
       if (this.processingPayment) {
-        this.processingPayment = false;
-        this.processingLabel = '';
+        this.resetProcessingState();
         this.showMessage('Payment is taking longer than expected. If money was deducted, your order is being processed.', 'info');
         this.loadOrders(true);
       }
@@ -739,11 +751,8 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       this.pendingRzp.open();
     } catch (err) {
       console.error('Failed to open Razorpay checkout on manual click', err);
-      this.processingPayment = false;
-      this.processingLabel = '';
-      if (this.paymentWatchdog) clearTimeout(this.paymentWatchdog);
+      this.resetProcessingState();
       this.showMessage('Could not open the payment window. Please try again.', 'error');
-      this.pendingRzp = null;
       // Allow the user to try again
       this.showPayButton = true;
     }
