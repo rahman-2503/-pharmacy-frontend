@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
@@ -85,17 +85,63 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   loadingSuppliers = false;
   verifyingFlag = false;
   private destroy$ = new Subject<void>();
+  private autoRefreshTimer: any = null;
   private readonly CACHE_KEY = 'admin_dashboard_cache_v1';
 
-  constructor(private apiService: ApiService) {}
+  constructor(private apiService: ApiService, private cdr: ChangeDetectorRef) {}
+
+  // The app is zoneless (no zone.js), so async HTTP/timer callbacks never
+  // trigger change detection on their own — call cd() after every async
+  // mutation to re-render the view.
+  private cd() {
+    try { this.cdr.detectChanges(); } catch { /* view may be detached mid-cycle */ }
+  }
 
   ngOnInit() {
     this.restoreFromCache();
     this.loadAllData();
     this.loadUsers();
+    this.startAutoRefresh();
+  }
+
+  // Real-time sync: silently refresh orders/drugs/suppliers so new doctor
+  // orders and admin drug additions appear without a manual page reload.
+  private startAutoRefresh() {
+    this.stopAutoRefresh();
+    this.autoRefreshTimer = setInterval(() => {
+      this.apiService.getOrders().pipe(takeUntil(this.destroy$)).subscribe({
+        next: (data) => {
+          this.orders = data.map(o => this.apiService.joinOrderWithDrug(o, this.drugs, this.doctorNameMap));
+          const emails = new Set<string>();
+          data.forEach(o => { if (o.doctorEmail) emails.add(o.doctorEmail); });
+          this.doctors = Array.from(emails);
+          if (this.currentSection === 'analytics') {
+            setTimeout(() => this.initCharts(), 100);
+          }
+          this.cd();
+        },
+        error: () => { /* keep last known data; next tick will retry */ }
+      });
+      this.apiService.getDrugs().subscribe({
+        next: (data) => {
+          this.drugs = data;
+          if (this.drugSearchQuery) this.applyDrugSearch();
+          this.cd();
+        },
+        error: () => { /* keep last known data */ }
+      });
+    }, 25000);
+  }
+
+  private stopAutoRefresh() {
+    if (this.autoRefreshTimer) {
+      clearInterval(this.autoRefreshTimer);
+      this.autoRefreshTimer = null;
+    }
   }
 
   ngOnDestroy() {
+    this.stopAutoRefresh();
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -155,10 +201,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         // Re-resolve doctor names on existing orders
         this.orders = this.orders.map(o => this.apiService.joinOrderWithDrug(o, this.drugs, this.doctorNameMap));
         this.loadingUsers = false;
+        this.cd();
       },
       error: (err) => {
         console.error('Failed to load users', err);
         this.loadingUsers = false;
+        this.cd();
       }
     });
   }
@@ -201,11 +249,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
             this.initCharts();
           }, 100);
         }
+        this.cd();
       },
       error: (err) => {
         console.error('Failed to load admin dashboard data', err);
         this.loading = false;
         this.loadError = true;
+        this.cd();
       }
     });
   }
@@ -318,32 +368,44 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   loadDrugs() {
-    this.apiService.getDrugs().subscribe(data => {
-      this.drugs = data;
-      this.applyDrugSearch();
+    this.apiService.getDrugs().subscribe({
+      next: (data) => {
+        this.drugs = data;
+        this.applyDrugSearch();
+        this.cd();
+      },
+      error: () => this.cd()
     });
   }
 
   loadSuppliers() {
-    this.apiService.getSuppliers().subscribe(data => {
-      this.suppliers = data;
-      this.supplierMapAdmin = {};
-      data.forEach(s => {
-        const key = (s.email || s.contact || '').toString();
-        if (key) this.supplierMapAdmin[key] = s.name;
-      });
+    this.apiService.getSuppliers().subscribe({
+      next: (data) => {
+        this.suppliers = data;
+        this.supplierMapAdmin = {};
+        data.forEach(s => {
+          const key = (s.email || s.contact || '').toString();
+          if (key) this.supplierMapAdmin[key] = s.name;
+        });
+        this.cd();
+      },
+      error: () => this.cd()
     });
   }
 
   loadOrders() {
-    this.apiService.getOrders().pipe(takeUntil(this.destroy$)).subscribe(data => {
-      this.orders = data.map(o => this.apiService.joinOrderWithDrug(o, this.drugs, this.doctorNameMap));
+    this.apiService.getOrders().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (data) => {
+        this.orders = data.map(o => this.apiService.joinOrderWithDrug(o, this.drugs, this.doctorNameMap));
 
-      const emails = new Set<string>();
-      data.forEach(o => {
-        if (o.doctorEmail) emails.add(o.doctorEmail);
-      });
-      this.doctors = Array.from(emails);
+        const emails = new Set<string>();
+        data.forEach(o => {
+          if (o.doctorEmail) emails.add(o.doctorEmail);
+        });
+        this.doctors = Array.from(emails);
+        this.cd();
+      },
+      error: () => this.cd()
     });
   }
 
@@ -356,9 +418,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   loadReports() {
-    this.apiService.getSalesReports().subscribe(data => {
-      this.salesReports = data;
-      this.calculateSalesAggregates();
+    this.apiService.getSalesReports().subscribe({
+      next: (data) => {
+        this.salesReports = data;
+        this.calculateSalesAggregates();
+        this.cd();
+      },
+      error: () => this.cd()
     });
   }
 
@@ -518,12 +584,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.verifyPickupDate = '';
         this.loadOrders();
         this.loadReports();
+        this.cd();
       },
       error: (err) => {
         console.error('Failed to verify order', err);
         this.verifyingOrderId = null;
         this.loadOrders();
         this.loadReports();
+        this.cd();
       }
     });
   }
@@ -539,11 +607,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       next: () => {
         this.loadOrders();
         this.loadReports();
+        this.cd();
       },
       error: (err) => {
         console.error('Failed to complete dispatch', err);
         this.loadOrders();
         this.loadReports();
+        this.cd();
       }
     });
   }
@@ -555,6 +625,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         next: () => {
           this.loadUsers();
           this.showMessage('User blocked successfully.', 'success');
+          this.cd();
         },
         error: (err: any) => {
           console.error('Failed to block user', err);
@@ -571,6 +642,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         next: () => {
           this.loadUsers();
           this.showMessage('User unblocked successfully.', 'success');
+          this.cd();
         },
         error: (err: any) => {
           console.error('Failed to unblock user', err);
@@ -587,6 +659,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         next: () => {
           this.loadUsers();
           this.showMessage('User deleted successfully.', 'success');
+          this.cd();
         },
         error: (err: any) => {
           console.error('Failed to delete user', err);
@@ -613,6 +686,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       next: () => {
         alert('Alert notification sent successfully!');
         this.notifFormModel.message = '';
+        this.cd();
       },
       error: (err) => alert('Failed to dispatch alert.')
     });
@@ -636,6 +710,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       next: () => {
         alert('Broadcast notification sent to all doctors!');
         this.notifFormModel.message = '';
+        this.cd();
       },
       error: (err) => alert('Failed to broadcast.')
     });
@@ -744,8 +819,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.message = message;
     this.messageType = type;
     this.showToast = true;
+    this.cd();
     setTimeout(() => {
       this.showToast = false;
+      this.cd();
     }, 3000);
   }
 }

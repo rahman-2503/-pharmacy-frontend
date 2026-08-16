@@ -54,6 +54,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   drugsLoaded = false;
   drugsLoadError = false;
   private destroy$ = new Subject<void>();
+  private autoRefreshTimer: any = null;
   processingLabel = '';
   message: string | null = null;
   messageType: 'success' | 'error' | 'info' = 'info';
@@ -122,6 +123,60 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     // Preload the Razorpay checkout script in the background so it is cached
     // (and the checkout flow resolves instantly) by the time the user pays.
     this.razorpayService.load().catch(() => {});
+    this.startAutoRefresh();
+  }
+
+  // Real-time sync: silently refresh drugs + orders so drugs added by the
+  // admin appear (and order status changes show up) without a page reload.
+  private startAutoRefresh() {
+    this.stopAutoRefresh();
+    this.autoRefreshTimer = window.setInterval(() => {
+      this.refreshDrugsSilently();
+      this.refreshOrdersSilently();
+    }, 45000);
+  }
+
+  private stopAutoRefresh() {
+    if (this.autoRefreshTimer) {
+      window.clearInterval(this.autoRefreshTimer);
+      this.autoRefreshTimer = null;
+    }
+  }
+
+  private refreshDrugsSilently() {
+    this.apiService.getDrugs().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (data) => {
+        this.drugs = data;
+        this.filteredDrugs = [...data];
+        if (data.length) {
+          this.drugsLoaded = true;
+          data.forEach(d => {
+            const key = d.id! || d.drugId!;
+            if (!this.quantitiesMap[key]) this.quantitiesMap[key] = 1;
+          });
+        }
+        this.loadingDrugs = false;
+        this.drugsLoadError = false;
+        this.persistCache();
+        this.cd();
+      },
+      error: () => { /* keep last known data; next tick will retry */ }
+    });
+  }
+
+  private refreshOrdersSilently() {
+    const userId = this.doctorUser?.email || '';
+    if (!userId) return;
+    this.apiService.getOrdersByUser(userId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (data) => {
+        this.orders = data.map(o => this.apiService.joinOrderWithDrug(o, this.drugs));
+        this.ordersLoaded = true;
+        this.loadingOrders = false;
+        this.persistCache();
+        this.cd();
+      },
+      error: () => { /* keep last known data; next tick will retry */ }
+    });
   }
 
   // Race a promise against a hard deadline so NO step in the payment
@@ -207,6 +262,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopNotificationPolling();
+    this.stopAutoRefresh();
     this.destroy$.next();
     this.destroy$.complete();
   }
