@@ -495,3 +495,604 @@ With both layers active, the platform stays **awake 24/7**.
 ---
 
 *Documentation generated for the Pharmacare Pharmacy Management System â€” version 4.0.*
+
+---
+
+# PART II — Building Everything From Scratch (Step by Step, Very Simple English)
+
+> This part is written for a **beginner / non-technical person**. Every step is explained in simple words. You can follow it to rebuild the entire project yourself.
+
+## 8. All Application Properties Explained (in Simple Words)
+
+Every microservice has a small settings file called `application.properties`. It works like a **settings menu on your phone** — each line is one setting. Here is what every line means, service by service.
+
+### 8.1 Eureka Server (`eureka-server`)
+
+| Property | What it does (simple words) |
+|----------|-----------------------------|
+| `server.port=8761` | The phone book app lives on **port 8761** of your computer |
+| `eureka.client.register-with-eureka=false` | The phone book does NOT add itself to the phone book (it is the book, not a caller) |
+| `eureka.client.fetch-registry=false` | It does not need to look up anyone — it already knows everyone |
+| `eureka.server.enable-self-preservation=false` | Removes dead services from the list immediately instead of keeping ghosts |
+| `eureka.instance.hostname=localhost` | Its address name when running on your computer |
+
+### 8.2 API Gateway (`API-Gateway`)
+
+| Property | What it does (simple words) |
+|----------|-----------------------------|
+| `server.port=8080` | The front door lives on **port 8080** |
+| `spring.application.name=api-gateway` | Its name in the phone book |
+| `spring.cloud.gateway...routes[i]` | The **door signs**: `Path=/users/**` means "requests starting with /users go to user-service", `/orders/**` ? order-service, `/inventory/**` ? inventory-service, `/payment/**` ? payment-service, `/notification/**` ? notification-service |
+| `uri=lb://USER-SERVICE` | `lb://` = "look up the real address in Eureka (load-balanced)" |
+| `spring.cloud.loadbalancer.ribbon.enabled=false` | Uses the new load balancer, not the old one |
+| `eureka.client.service-url.defaultZone=...` | Where the phone book lives (default `http://localhost:8761/eureka/`) |
+| `jwt.secret=...` | The **secret key** used to check ID cards (tokens). Same key everywhere |
+| `cors.allowed.origins=...` | Which website addresses are allowed to talk to the gateway |
+
+### 8.3 User Service (`user-service`) — port 8081
+
+| Property | What it does (simple words) |
+|----------|-----------------------------|
+| `server.port=8081` | Lives on **port 8081** |
+| `spring.application.name=USER-SERVICE` | Its name in the phone book (written in capital letters) |
+| `spring.datasource.url=jdbc:postgresql://localhost:5432/pharmacy_db` | How to connect to **its** database (PostgreSQL, database `pharmacy_db`) |
+| `spring.datasource.username/password` | Database login (default `postgres`/`postgres` on a local computer) |
+| `spring.jpa.hibernate.ddl-auto=update` | **Auto-creates/updates tables** from the code — no SQL files needed |
+| `spring.jpa.database-platform=PostgreSQLDialect` | Tells Hibernate it is talking to PostgreSQL |
+| `management.endpoints.web.exposure.include=health` | Makes the `/health` URL public (used by the keep-alive pinger) |
+| `jwt.secret=...` | The secret key that **signs** the ID cards |
+
+### 8.4 Order Service (`order-service`) — port 8082
+
+Same database settings (uses database `order_db`), plus:
+
+| Property | What it does (simple words) |
+|----------|-----------------------------|
+| `resilience4j.circuitbreaker...` | **Circuit breakers**: if the inventory or payment service is sick, the breaker opens and the order service does not hang forever waiting |
+| `spring.rabbitmq.host/port/username/password` | Where the **post office (RabbitMQ)** lives (default `localhost:5672`, login `guest`/`guest`) |
+| `spring.rabbitmq.ssl.enabled=false` | No SSL when running locally (SSL is switched on in the cloud) |
+
+### 8.5 Supplier-Inventory Service (`supplier-inventory-service`) — port 8083
+
+Same settings, database `pharmacy_inventory`, plus the same RabbitMQ settings. It stores the **medicine catalog** (`drug` table) and the **suppliers** table.
+
+### 8.6 Notification Service (`notification-service`) — port 8084
+
+Same settings, database `notification_db`, plus the same RabbitMQ settings. It **listens** to the post office for new messages.
+
+### 8.7 Payment Service (`payment-service`) — port 8085
+
+Same settings, database `payment_db`, plus:
+
+| Property | What it does (simple words) |
+|----------|-----------------------------|
+| `razorpay.key.id=rzp_test_...` | Your Razorpay **test** API key (test payments only) |
+| `razorpay.key.secret=...` | The secret half of the Razorpay key (like a password) |
+| `jwt.secret=...` | Same secret key (so it can check the same ID cards) |
+| `jwt.expiration=86400000` | Token life in milliseconds (86 400 000 ms = 24 hours) |
+
+### 8.8 The Port Summary (memorize this little table)
+
+| Service | Port |
+|---------|------|
+| Eureka Server | **8761** |
+| API Gateway | **8080** |
+| User Service | **8081** |
+| Order Service | **8082** |
+| Supplier-Inventory Service | **8083** |
+| Notification Service | **8084** |
+| Payment Service | **8085** |
+| Frontend (dev / production) | **4200 / 10000** |
+
+---
+
+## 9. Building the Backend — Step by Step
+
+### Step 9.1 — Create the project skeleton
+
+1. Go to **https://start.spring.io** (Spring Initializr — a website that creates Spring Boot projects for you).
+2. Choose: **Maven**, **Java 21**, **Spring Boot 4.x**.
+3. Group: `com.example` · Artifact: the service name (e.g. `eureka-server`, `user-service`, …).
+4. Add dependencies, click **Generate**, and unzip the downloaded project into your `backend` folder. Repeat for each service with its own dependencies (see 9.9).
+
+> Instead of the website, you can also just copy this project's folders — they are already correct.
+
+### Step 9.2 — Eureka Server (the phone directory)
+
+1. Add dependency: `spring-cloud-starter-netflix-eureka-server`.
+2. Add `@EnableEurekaServer` above the main class:
+
+```java
+@SpringBootApplication
+@EnableEurekaServer
+public class EurekaServerApplication { ... }
+```
+
+3. Set `server.port=8761` and the two "don't register yourself" settings (Section 8.1).
+4. Run it ? open **http://localhost:8761** ? you see the Eureka dashboard (empty for now).
+
+### Step 9.3 — User Service (accounts + JWT authentication)
+
+1. Dependencies: Web, Security, Data JPA, Validation, Eureka Client, Actuator, PostgreSQL, Lombok, **jjwt (0.11.5)**, java-dotenv (Section 9.9 explains each).
+2. Create the `User` entity: `id`, `name`, `email`, `contact`, `password`, `role` (DOCTOR/ADMIN), `status`.
+3. Create `SecurityConfig` with a **BCryptPasswordEncoder** bean — passwords are stored as scrambled hashes, never as plain text.
+4. Create **`JwtUtil`** — the ID-card machine:
+
+```java
+public String generateToken(Long userId, String role) {
+    return Jwts.builder()
+        .setSubject(userId.toString())      // who this card belongs to
+        .claim("role", role)                // their job title (DOCTOR/ADMIN)
+        .setIssuedAt(new Date())
+        .setExpiration(new Date(System.currentTimeMillis() + 60 * 60 * 1000)) // valid 1 hour
+        .signWith(getKey(), SignatureAlgorithm.HS256) // signed with the secret key
+        .compact();
+}
+```
+
+5. `UserService`:
+   - `signup(...)` ? checks the email is not already used ? saves with BCrypt-hashed password.
+   - `login(...)` ? finds the user ? checks the password with BCrypt ? returns the **JWT** (the ID card).
+   - **Admin auto-creation**: on startup, if no user exists, it creates `admin@gmail.com` / `admin@123`.
+   - `resetDoctorPassword(id, newPassword)` ? new BCrypt hash for a doctor (admin-only feature).
+6. `UserController` (all endpoints under `/users`):
+
+| Method | Endpoint | What it does |
+|--------|----------|--------------|
+| POST | `/users/signup` | Register a doctor |
+| POST | `/users/login` | Log in ? returns JWT |
+| POST | `/users/admin/change-password` | Admin changes own password |
+| POST | `/users/{id}/reset-password?newPassword=` | **Admin resets a doctor's password** |
+| GET | `/users/{id}` | Get one user's profile |
+| GET | `/users` | List all users (admin) |
+| PATCH | `/users/{id}/status` | Block / unblock a user |
+| DELETE | `/users/{id}` | Delete a user |
+
+### Step 9.4 — Supplier-Inventory Service (the medicine catalog)
+
+1. Dependencies: Web, Data JPA, PostgreSQL, Eureka Client, RabbitMQ.
+2. Entities: `Drug` (id, name, category, price, quantity) and `Supplier`.
+3. Endpoints under `/inventory`:
+
+| Method | Endpoint | What it does |
+|--------|----------|--------------|
+| POST | `/inventory/drug` | Add a medicine |
+| GET | `/inventory/drug` | List medicines (used by the catalog) |
+| GET | `/inventory/drug/{id}` | Get one medicine |
+| PUT | `/inventory/drug/{id}` | Edit a medicine |
+| DELETE | `/inventory/drug/{id}` | Remove a medicine |
+| PUT | `/inventory/drug/reduce/{id}/{qty}` | Reduce stock (called by order service) |
+| PUT | `/inventory/drug/increase/{id}/{qty}` | Increase stock |
+| POST/GET/PUT/DELETE | `/inventory/supplier...` | Manage suppliers |
+
+### Step 9.5 — Order Service (orders + **Feign Client** + **RabbitMQ**)
+
+1. Dependencies: Web, Data JPA, PostgreSQL, Eureka Client, **OpenFeign**, Resilience4j, RabbitMQ.
+2. Add `@EnableFeignClients` on the main class.
+3. Create **Feign clients** — "ask a colleague" interfaces:
+
+```java
+@FeignClient(name = "SUPPLIER-INVENTORY-SERVICE")   // ask the phone book for this service
+public interface InventoryClient {
+    @GetMapping("/inventory/drug/{id}") Drug getDrug(@PathVariable Long id);
+    @PutMapping("/inventory/drug/reduce/{id}/{qty}") void reduceStock(@PathVariable Long id, @PathVariable int qty);
+}
+```
+
+   The order service calls `inventoryClient.reduceStock(...)` like a normal function — Feign finds the real service through Eureka and sends the HTTP request for you. Wrap the calls in a **Resilience4j circuit breaker** so the order service survives if inventory is down.
+
+4. Create the RabbitMQ post office box (`RabbitMQConfig`): exchange `order_exchange`, queue `order_queue`, routing key `order_routing`.
+5. `RabbitMQProducer` — sends the "order placed" message after a successful payment.
+6. `OrderController`:
+
+| Method | Endpoint | What it does |
+|--------|----------|--------------|
+| POST | `/orders` | Place an order (status PENDING, reduces stock via Feign) |
+| GET | `/orders` | List orders (admin sees all) |
+| PUT | `/orders/verify/{id}` | Admin verifies the order |
+| PUT | `/orders/pick/{id}` | Admin marks it picked up |
+| PUT | `/orders/cancel/{id}` | Cancel an order |
+| PUT | `/orders/fail/{id}` / `retry/{id}` | Handle failed / retried payments |
+| GET | `/orders/sales` | Sales report data |
+| PUT | `/orders/update-status/{orderId}/{status}` | Direct status update |
+
+### Step 9.6 — Payment Service (Razorpay sandbox)
+
+1. Dependencies: Web, Data JPA, PostgreSQL, Eureka Client, RabbitMQ, **Razorpay SDK**.
+2. Configure the test keys (`razorpay.key.id`, `razorpay.key.secret`) in `application.properties`.
+3. Endpoints:
+
+| Method | Endpoint | What it does |
+|--------|----------|--------------|
+| POST | `/payment/create` | Ask Razorpay to prepare a payment |
+| POST | `/payment/success?orderId&amount&paymentId&signature&razorpayOrderId` | Frontend calls this after the payment popup; demo mode accepts the test signature, records the payment, and the order becomes **PLACED** |
+| POST | `/payment/fail` | Record a failed payment |
+
+### Step 9.7 — Notification Service (the RabbitMQ listener)
+
+1. Dependencies: Web, Data JPA, PostgreSQL, Eureka Client, **RabbitMQ**.
+2. Create `NotificationConsumer` with `@RabbitListener(queues = "order_queue")` — it wakes up whenever a message is in the box and saves a `Notification` row (user, message, read/unread).
+3. Endpoints:
+
+| Method | Endpoint | What it does |
+|--------|----------|--------------|
+| GET | `/notification` | My notifications |
+| GET | `/notification/unread` | Only unread ones |
+| PUT | `/notification/read` | Mark as read |
+| POST | `/notification` | Send a broadcast |
+
+### Step 9.8 — API Gateway (the front door + role-based authorization)
+
+1. Dependencies: `spring-cloud-starter-gateway-server-webflux` (reactive gateway), Eureka Client, jjwt, Actuator.
+2. Set `server.port=8080` and define the **routes** (the door signs) — Section 8.2 table.
+3. Write a **JWT filter** (`JwtAuthFilter`) that runs on every request:
+   - Reads the `Authorization: Bearer <token>` header.
+   - Checks the signature with the same secret key (like checking the hologram).
+   - Puts the user's ID and **role** into the request.
+4. **Role-based rules** (who is allowed where):
+
+| Path | Allowed for |
+|------|-------------|
+| `/users/login`, `/users/signup`, `/health` | Everyone (public) |
+| `/users/{id}/reset-password` | **ADMIN only** (a DOCTOR token gets **403 Forbidden**) |
+| `/users/**` (profile etc.) | Logged-in doctors & admin |
+| `/orders/**`, `/payment/**` | Logged-in doctors & admin |
+| `/inventory/**` | Logged-in users (doctors read, admin writes) |
+
+### Step 9.9 — The Dependencies (each one in simple words)
+
+| Dependency | What it does |
+|------------|--------------|
+| **Spring Boot DevTools** | Makes development nicer: auto-restart when code changes (optional in this project) |
+| **Spring Data JPA** | Lets you save/read database rows using Java code, no SQL needed |
+| **Lombok** | Removes boring boilerplate code — `@Data` creates getters/setters automatically |
+| **Spring Web** | Makes a REST API (endpoints like `/users/login`) |
+| **Spring Security** | Password hashing (BCrypt) and login rules |
+| **Spring Validation** | Checks inputs (e.g. "email is required") |
+| **Eureka Client** | Registers the service in the phone book |
+| **OpenFeign** | Lets services call each other easily |
+| **Resilience4j** | Circuit breakers — protects services when others are down |
+| **RabbitMQ** | Message bus — the post office |
+| **jjwt** | Creates and checks JWT ID cards |
+| **PostgreSQL Driver** | Lets Java talk to the database |
+| **Actuator** | Adds the `/health` check URL |
+| **java-dotenv** | Reads environment variables / `.env` files |
+
+---
+
+## 10. Testing Every Endpoint in Postman
+
+**Postman** is a free app for testing APIs. Download it from https://www.postman.com.
+
+### Step 10.1 — Prepare
+
+1. Start all services (Eureka first, then the 6 services, then the gateway) — Section 4 of the README.
+2. Open Postman ? **New ? HTTP Request**.
+3. Use the **gateway** address: `http://localhost:8080`.
+
+### Step 10.2 — The test list (do them in this order)
+
+| # | Method | URL | Body (JSON) | Expected |
+|---|--------|-----|-------------|----------|
+| 1 | GET | `/health` | — | `200` |
+| 2 | POST | `/users/signup` | `{ "name": "Dr Test", "email": "dr1@test.com", "contact": "9876543210", "password": "pass1234", "role": "doctor" }` | `200` + user JSON |
+| 3 | POST | `/users/login` | `{ "email": "dr1@test.com", "password": "pass1234" }` | `200` + **JWT token** (copy it) |
+| 4 | GET | `/inventory/drug` | — | `200` + list of medicines |
+| 5 | POST | `/orders` | `{ "drugId": 9, "quantity": 2 }` | `200` + order (PENDING) |
+| 6 | POST | `/payment/success?orderId=1&amount=50&paymentId=test&signature=test&razorpayOrderId=test` | — | `200` + order ? PLACED |
+| 7 | GET | `/notification` | — | `200` + "order placed" notification |
+| 8 | POST | `/users/login` | `{ "email": "admin@gmail.com", "password": "admin@123" }` | `200` + **admin token** |
+| 9 | GET | `/orders` (admin token) | — | `200` + all orders |
+| 10 | PUT | `/orders/verify/1` (admin token) | — | `200` ? VERIFIED |
+| 11 | PUT | `/orders/pick/1` (admin token) | — | `200` ? PICKED UP |
+| 12 | POST | `/users/2/reset-password?newPassword=newpass1` (admin token) | — | `200` "Password updated successfully" |
+| 13 | POST | `/users/2/reset-password?newPassword=hack` (doctor token) | — | **`403`** (doctors are blocked) |
+
+> **Tip:** In Postman, create an Environment with `base = http://localhost:8080` and use `{{base}}` in every URL.
+
+---
+
+## 11. Building the Angular Frontend — Step by Step
+
+### Step 11.1 — Create the Angular app
+
+```bash
+npm install -g @angular/cli        # install the Angular command tool
+ng new pharmacare                  # creates the project (choose SCSS or CSS)
+cd pharmacare
+npm install                        # install packages
+ng serve                           # start the dev server ? http://localhost:4200
+```
+
+### Step 11.2 — Create the pages (components)
+
+```bash
+ng generate component pages/home
+ng generate component pages/login
+ng generate component pages/doctor-dashboard
+ng generate component pages/admin-dashboard
+ng generate component pages/about
+ng generate component pages/services
+ng generate component pages/contact
+ng generate component pages/learn
+ng generate component pages/pricing
+ng generate component components/header
+ng generate component components/footer
+```
+
+### Step 11.3 — Create the services, guard and interceptor
+
+```bash
+ng generate service services/api
+ng generate service services/auth
+ng generate service services/razorpay
+ng generate guard guards/auth
+ng generate interceptor interceptors/auth
+```
+
+- **api.service.ts** — one central file with every backend call (`login`, `signup`, `getDrugs`, `createOrder`, `verifyOrder`, `resetDoctorPassword`, …).
+- **auth.service.ts** — saves the JWT in `localStorage`, remembers the current user.
+- **auth.interceptor.ts** — automatically adds `Authorization: Bearer <token>` to every request.
+- **auth.guard.ts** — blocks `/doctor` and `/admin` when nobody is logged in.
+
+### Step 11.4 — Wire the routes
+
+In `app.routes.ts`, map paths to pages and protect the dashboards with the guard:
+
+```ts
+{ path: 'login',  component: LoginComponent },
+{ path: 'doctor', component: DoctorDashboardComponent, canActivate: [authGuard] },
+{ path: 'admin',  component: AdminDashboardComponent, canActivate: [authGuard] },
+{ path: '**', redirectTo: '' }
+```
+
+### Step 11.5 — Add the dev proxy (frontend ? backend connection)
+
+Create `proxy.conf.json` — it makes the frontend talk to the gateway during development:
+
+```json
+{ "/api": { "target": "http://localhost:8080", "changeOrigin": true, "pathRewrite": { "^/api": "" } } }
+```
+
+Use `apiUrl: '/api'` in `environments/environment.ts`, so every request goes to `/api/users/login` and the proxy quietly forwards it to `http://localhost:8080/users/login`.
+
+### Step 11.6 — Production server
+
+Create `server.js` (Express) that serves the built files + SPA fallback + `/health`:
+
+```bash
+npm install express compression
+```
+
+`npm start` ? runs `node server.js` on port 10000 (or Render's port). Build first with `npm run build`.
+
+---
+
+## 12. Connecting Frontend & Backend + Full Working Tests
+
+### How the two sides connect
+
+| What the user does | Frontend calls | Backend handles |
+|--------------------|----------------|-----------------|
+| Signs up | `POST /api/users/signup` | user-service saves the doctor |
+| Logs in | `POST /api/users/login` | user-service checks password, returns JWT |
+| Searches medicines | `GET /api/inventory/drug` | inventory-service searches the catalog |
+| Places order | `POST /api/orders` | order-service reduces stock (Feign) + creates order |
+| Pays | `POST /api/payment/success?...` | payment-service records payment ? PLACED |
+| Doctor opens dashboard | `GET /api/orders`, `GET /api/notification/...` | order + notification services |
+| Admin verifies/picks up | `PUT /api/orders/verify/{id}`, `/pick/{id}` | order-service updates status |
+| Admin resets password | `POST /api/users/{id}/reset-password` | user-service (ADMIN only) |
+
+### The full working tests we ran (and they passed)
+
+1. **Signup test** — new doctor registers ? page auto-redirects to login with email pre-filled + success banner. ?
+2. **Login test** — doctor logs in ? JWT stored ? dashboard opens. ?
+3. **Catalog test** — 13 medicines shown, search "Dolo" returns exactly 1 card. ?
+4. **Order + payment test** — cart ? checkout ? order PENDING ? Razorpay demo payment ? order PLACED. ?
+5. **Admin test** — order appears on admin dashboard in real time ? Verify ? Picked Up with date. ?
+6. **Password reset test** — admin resets doctor's password in the new modal ? old password rejected ("Invalid password") ? new password logs in. ?
+7. **Security test** — a doctor token calling the reset endpoint gets **403**. ?
+8. **Keep-alive test** — all 8 `/health` URLs return 200. ?
+
+---
+
+## 13. Pushing & Committing to GitHub (the Git Commands)
+
+Open a terminal in your project folder and run these commands **in order**:
+
+```bash
+git init                              # 1. start tracking files in this folder
+git add .                             # 2. add all files to the "staging area"
+git commit -m "Initial commit"        # 3. save a snapshot with a message
+git branch -M main                    # 4. rename the branch to "main"
+git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO.git   # 5. connect to GitHub
+git push -u origin main               # 6. upload the snapshot to GitHub
+```
+
+Useful everyday commands:
+
+```bash
+git status            # what changed?
+git add file.js       # stage one file
+git commit -m "fix"   # commit with a message
+git pull              # download the latest from GitHub
+git push              # upload your commits
+git log --oneline     # show commit history
+```
+
+The two real repos for this project are:
+
+- Backend: `https://github.com/rahman-2503/pharmacy-managment-system` (branch `main`)
+- Frontend: `https://github.com/rahman-2503/-pharmacy-frontend` (branches `master` and `main`)
+
+> **Tip:** create a **GitHub Personal Access Token** (Settings ? Developer settings ? Tokens) and use it as the password when GitHub asks — it is more secure than your real password.
+
+---
+
+## 14. Creating Docker Images — Step by Step
+
+**Docker** packages an app with everything it needs (like a moving box with the furniture already inside). Render runs these boxes.
+
+### Step 14.1 — The Dockerfile (one per service)
+
+Each service folder contains a `Dockerfile` like this:
+
+```dockerfile
+FROM eclipse-temurin:21-jdk-alpine AS build   # stage 1: build with Java 21
+WORKDIR /app
+COPY mvnw pom.xml ./
+COPY .mvn .mvn
+RUN chmod +x mvnw
+RUN ./mvnw dependency:go-offline -B           # download libraries
+COPY src src
+RUN ./mvnw package -DskipTests -B             # compile into app.jar
+
+FROM eclipse-temurin:21-jre-alpine            # stage 2: small runtime image
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8081                                   # the service port
+ENTRYPOINT ["java", "-jar", "app.jar"]        # start the app
+```
+
+### Step 14.2 — Build, tag and push
+
+```bash
+docker login                     # log in to Docker Hub (your username + password)
+docker build -t rahman5187/user-service:4.0.0 .        # build the image
+docker push rahman5187/user-service:4.0.0              # upload it to Docker Hub
+```
+
+Repeat for each service with its own name and port:
+
+| Service | Image name | Port |
+|---------|------------|------|
+| Eureka Server | `rahman5187/eureka-server:4.0.0` | 8761 |
+| User Service | `rahman5187/user-service:4.0.0` | 8081 |
+| Order Service | `rahman5187/order-service:4.0.0` | 8082 |
+| Supplier-Inventory Service | `rahman5187/supplier-inventory-service:4.0.0` | 8083 |
+| Notification Service | `rahman5187/notification-service:4.0.0` | 8084 |
+| Payment Service | `rahman5187/payment-service:4.0.0` | 8085 |
+| API Gateway | `rahman5187/api-gateway:4.0.0` | 8080 |
+
+```bash
+docker images        # see your local images
+docker run -p 8081:8081 rahman5187/user-service:4.0.0   # test an image locally
+```
+
+---
+
+## 15. Free Database: Aiven PostgreSQL (Step by Step)
+
+The project uses **5 databases** (one per service). Aiven gives you a **free PostgreSQL** where you can create all five.
+
+### Step 15.1 — Create the account & the free database
+
+1. Go to **https://aiven.io** ? **Sign Up** (free).
+2. After login: **Create a new service**.
+3. Choose **Aiven for PostgreSQL**.
+4. **Cloud:** choose the provider with the "Free" tag (e.g. Google Cloud free region).
+5. **Plan:** choose **Hobbyist (Free)** — 1 GB RAM, 5 GB storage.
+6. **Service name:** `pharmacy-postgres` ? **Create**.
+7. Wait ~1 minute until the service shows **Running**.
+
+### Step 15.2 — Find the connection details
+
+In the service overview you will see:
+
+- **Host** — e.g. `pharmacy-postgres-xxxxxx-project.aivencloud.com`
+- **Port** — e.g. `28766`
+- **User** — `avnadmin`
+- **Password** — shown once after creation (copy and save it!)
+- **SSL** — Aiven requires `sslmode=require`
+
+### Step 15.3 — Create the 5 databases
+
+Install `psql` (PostgreSQL command tool) or use a free GUI like **pgAdmin / DBeaver**, connect with the details above, and run:
+
+```sql
+CREATE DATABASE pharmacy_db;
+CREATE DATABASE order_db;
+CREATE DATABASE pharmacy_inventory;
+CREATE DATABASE payment_db;
+CREATE DATABASE notification_db;
+```
+
+### Step 15.4 — Integrate with the services (environment variables)
+
+The services already read `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`. Set them like this (on Render or in a `.env` file):
+
+```
+DB_URL=jdbc:postgresql://pharmacy-postgres-xxxxxx.aivencloud.com:28766/pharmacy_db?sslmode=require
+DB_USERNAME=avnadmin
+DB_PASSWORD=your-aiven-password
+```
+
+Use the same host/port/password for all 5 services — only the database name changes (`order_db`, `pharmacy_inventory`, `payment_db`, `notification_db`). Hibernate creates the tables automatically on first startup.
+
+---
+
+## 16. Deploying Everything on Render (Free Tier) — Step by Step
+
+### Step 16.1 — Create a Render account
+
+Go to **https://render.com** ? **Sign Up** (free) with GitHub (recommended — connecting GitHub makes deploys one click).
+
+### Step 16.2 — Deploy the frontend (from the GitHub repo)
+
+1. Dashboard ? **New** ? **Web Service**.
+2. **Connect the repository** `rahman-2503/-pharmacy-frontend` (branch `master`).
+3. Name: `pharmacy-frontend`.
+4. Runtime: **Node**.
+5. Build command: `npm install && npm run build`
+6. Start command: `npm start`
+7. **Health Check Path:** `/health` (Render uses it to know the app is alive).
+8. Plan: **Free** ? **Create Web Service**.
+9. Wait for the deploy to finish (you see "Live" + your URL `https://pharmacy-frontend-xxxx.onrender.com`).
+
+### Step 16.3 — Deploy the 7 backend services (from Docker images)
+
+Render can run a Docker image directly without building anything:
+
+1. **New ? Web Service ? "Deploy an existing image from a registry".**
+2. Image: `docker.io/rahman5187/eureka-server:4.0.0` ? **deploy first**.
+3. Then deploy the others in this order: user-service ? inventory-service ? order-service ? notification-service ? payment-service ? **api-gateway last**.
+4. For each service set the environment variables (Section 15.4 + the ones below) and the health check path `/health`.
+5. Free plan for all.
+
+**Environment variables to set on Render (example values):**
+
+| Variable | Example value |
+|----------|---------------|
+| `DB_URL` | `jdbc:postgresql://<aiven-host>:28766/user_db?sslmode=require` (per service) |
+| `DB_USERNAME` | `avnadmin` |
+| `DB_PASSWORD` | your Aiven password |
+| `EUREKA_URL` | `http://eureka-server-xxxx.onrender.com/eureka/` |
+| `RABBITMQ_HOST` | your hosted RabbitMQ host (or a free CloudAMQP instance) |
+| `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` | RabbitMQ login |
+| `JWT_SECRET` | a long random string (same on all services!) |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Razorpay test keys |
+| `CORS_ALLOWED_ORIGINS` | your frontend URL |
+
+> For a totally free setup, RabbitMQ can also be a free **CloudAMQP** instance (register at cloudamqp.com ? free "Little Lemur" plan ? put its host/user/password in the variables).
+
+### Step 16.4 — Start order matters (important!)
+
+1. Eureka must be **live** first (other services crash-loop until it is up).
+2. Start the 5 services next.
+3. Start the **API Gateway last** — it connects to everything.
+
+### Step 16.5 — Add the keep-alive so it never sleeps
+
+Render free tier **sleeps after 15 minutes without traffic**. Add the two GitHub Actions workflows (Section 7) — they ping all 8 `/health` URLs every 5 minutes, so the apps never sleep. Both repos in this project already have them, and all checks pass.
+
+### Step 16.6 — Final checks
+
+- Visit your frontend URL ? you should see the home page.
+- `https://<your-frontend>/health` ? `{"status":"UP"...}`.
+- Log in as `admin@gmail.com` / `admin@123` ? admin dashboard works.
+- Sign up a doctor ? order a medicine ? pay with the test gateway ? verify on the admin dashboard.
+- Wait 30 minutes and check the site again — it should still be instant (keep-alive is working).
+
+---
+
+*End of Part II — Building Everything From Scratch. Combined with Part I, this document covers the entire Pharmacare platform: what it is, how it works, how to build it, test it, and put it live.*
