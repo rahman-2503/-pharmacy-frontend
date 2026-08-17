@@ -705,6 +705,64 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ✅ Admin resets a doctor's password (modal flow)
+  resetPwUser: User | null = null;
+  resetPwModel = { password: '', confirm: '' };
+  resetPwError: string | null = null;
+  resetPwSuccess: string | null = null;
+  resetPwProcessing = false;
+
+  openResetPwModal(user: User) {
+    this.resetPwUser = user;
+    this.resetPwModel = { password: '', confirm: '' };
+    this.resetPwError = null;
+    this.resetPwSuccess = null;
+    this.resetPwProcessing = false;
+    this.cd();
+  }
+
+  closeResetPwModal() {
+    this.resetPwUser = null;
+    this.resetPwModel = { password: '', confirm: '' };
+    this.resetPwError = null;
+    this.resetPwSuccess = null;
+    this.resetPwProcessing = false;
+    this.cd();
+  }
+
+  submitResetPassword() {
+    if (!this.resetPwUser || this.resetPwProcessing) return;
+    this.resetPwError = null;
+
+    if (!this.resetPwModel.password || this.resetPwModel.password.length < 4) {
+      this.resetPwError = 'New password must be at least 4 characters.';
+      this.cd();
+      return;
+    }
+    if (this.resetPwModel.password !== this.resetPwModel.confirm) {
+      this.resetPwError = 'Passwords do not match.';
+      this.cd();
+      return;
+    }
+
+    this.resetPwProcessing = true;
+    this.apiService.resetDoctorPassword(this.resetPwUser.id!, this.resetPwModel.password).subscribe({
+      next: (res: any) => {
+        this.resetPwProcessing = false;
+        this.resetPwSuccess = res || 'Password updated successfully.';
+        this.showMessage('Doctor password updated successfully.', 'success');
+        this.cd();
+      },
+      error: (err: any) => {
+        this.resetPwProcessing = false;
+        const body = err?.error;
+        this.resetPwError = (typeof body === 'string' ? body : err?.message) || 'Failed to reset password.';
+        console.error('Failed to reset password', err);
+        this.cd();
+      }
+    });
+  }
+
   sendCustomNotif() {
     if (!this.notifFormModel.userId || !this.notifFormModel.message) {
       alert('Please select a recipient and input a message');

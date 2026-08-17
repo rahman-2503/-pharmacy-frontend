@@ -560,6 +560,7 @@
                 <span *ngIf="u.status === 'BLOCKED'" class="badge badge-danger">Blocked</span>
               </td>
               <td class="table-actions">
+                <button class="btn btn-outline btn-sm" (click)="openResetPwModal(u)">Change Password</button>
                 <button *ngIf="u.status === 'ACTIVE'" class="btn btn-secondary btn-sm" (click)="blockUser(u.id!)">Block</button>
                 <button *ngIf="u.status === 'BLOCKED'" class="btn btn-secondary btn-sm" (click)="unblockUser(u.id!)">Unblock</button>
                 <button class="btn btn-danger btn-sm" (click)="deleteUser(u.id!)">Delete</button>
@@ -707,4 +708,48 @@
     </div>
     </div>
   </main>
+
+  <!-- Doctor Password Reset Modal -->
+  <div class="modal-backdrop" *ngIf="resetPwUser" (click)="resetPwProcessing ? null : closeResetPwModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="font-size: 16px; font-weight: 700; margin: 0;">🔑 Change Doctor Password</h3>
+        <button type="button" class="close-modal-btn" (click)="closeResetPwModal()" [disabled]="resetPwProcessing">&times;</button>
+      </div>
+      <div class="modal-body" *ngIf="!resetPwSuccess">
+        <p style="font-size: 14px; color: var(--text-muted);">
+          Reset the login password for
+          <strong style="color: var(--text-dark);">{{ resetPwUser.name }}</strong>
+          (<code>{{ resetPwUser.email }}</code>).
+        </p>
+
+        <div class="form-group">
+          <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px;">New Password</label>
+          <input type="password" name="resetNewPassword" [(ngModel)]="resetPwModel.password" placeholder="Min 4 characters">
+        </div>
+
+        <div class="form-group">
+          <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px;">Confirm New Password</label>
+          <input type="password" name="resetConfirmPassword" [(ngModel)]="resetPwModel.confirm" placeholder="Repeat new password">
+        </div>
+
+        <span class="error-msg" *ngIf="resetPwError" style="display: block; color: var(--danger-color); font-size: 13px;">{{ resetPwError }}</span>
+
+        <div class="modal-footer-actions">
+          <button type="button" class="btn btn-outline" (click)="closeResetPwModal()" [disabled]="resetPwProcessing">Cancel</button>
+          <button type="button" class="btn btn-primary" (click)="submitResetPassword()" [disabled]="resetPwProcessing">
+            {{ resetPwProcessing ? 'Updating...' : 'Update Password' }}
+          </button>
+        </div>
+      </div>
+      <div class="modal-body" *ngIf="resetPwSuccess">
+        <div class="modal-success-screen" style="text-align: center; padding: 24px 20px;">
+          <span class="success-check" style="font-size: 40px; color: var(--success-color); background-color: rgba(16, 185, 129, 0.1); width: 70px; height: 70px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; margin-bottom: 12px;">✓</span>
+          <p style="font-size: 14px; font-weight: 600;">{{ resetPwSuccess }}</p>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">The doctor can now sign in with the new password.</p>
+          <button type="button" class="btn btn-primary" style="margin-top: 16px;" (click)="closeResetPwModal()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

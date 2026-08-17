@@ -167,6 +167,14 @@ export class ApiService {
     });
   }
 
+  public resetDoctorPassword(id: string, newPassword: string): Observable<string> {
+    const params = `?newPassword=${encodeURIComponent(newPassword)}`;
+    return this.http.post(`${this.baseUrl}/users/${id}/reset-password${params}`, {}, {
+      headers: this.getHeaders(),
+      responseType: 'text'
+    });
+  }
+
   public deleteUser(id: string): Observable<string> {
     return this.http.delete(`${this.baseUrl}/users/${id}`, {
       headers: this.getHeaders(),
