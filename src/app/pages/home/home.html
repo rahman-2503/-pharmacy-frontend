@@ -1,4 +1,4 @@
-<div class="home-page">
+<div class="home-page page-transition">
   <!-- Hero Section -->
   <section class="hero-section wavy-banner-container">
     <!-- Floating decorative orbs -->
@@ -88,8 +88,12 @@
   <section class="trusted-section">
     <div class="container">
       <p class="trusted-title" data-reveal="fade">TRUSTED BY LEADING MEDICALS & CLINICS ACROSS INDIA</p>
-      <div class="trusted-logos">
-        <div class="logo-item hover-lift" *ngFor="let logo of trustedLogos; let i = index" data-reveal="up" [attr.data-reveal-delay]="i * 60">{{ logo }}</div>
+      <!-- Sliding logo marquee (duplicated track loops seamlessly) -->
+      <div class="trusted-logos marquee" data-reveal="fade">
+        <div class="marquee-track">
+          <div class="logo-item" *ngFor="let logo of trustedLogos">{{ logo }}</div>
+          <div class="logo-item" *ngFor="let logo of trustedLogos">{{ logo }}</div>
+        </div>
       </div>
     </div>
   </section>

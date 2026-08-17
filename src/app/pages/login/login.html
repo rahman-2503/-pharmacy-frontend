@@ -1,4 +1,4 @@
-<div class="login-page-container">
+<div class="login-page-container page-transition">
   <!-- Wavy Header Banner -->
   <div class="login-banner wavy-banner-container">
     <span class="orb orb--teal" style="width: 180px; height: 180px; top: -30px; right: 6%;"></span>
@@ -16,13 +16,19 @@
 
   <div class="container login-grid">
     <!-- Login Card (Left Side) -->
-    <div class="card login-card hover-lift" *ngIf="activeTab === 'login'" data-reveal="up">
+    <div class="card login-card hover-lift glass-card" *ngIf="activeTab === 'login'" data-reveal="up">
       <div class="card-header">
         <h3>Login</h3>
         <div class="role-selector">
           <button type="button" [class.active]="loginRole === 'doctor'" (click)="setLoginRole('doctor')">Doctor</button>
           <button type="button" [class.active]="loginRole === 'admin'" (click)="setLoginRole('admin')">Admin</button>
         </div>
+      </div>
+
+      <div class="success-banner animate-slide-down" *ngIf="signupSuccess" role="status">
+        <span class="success-icon">&#10004;</span>
+        <span>Registration successful! Please log in with your credentials.</span>
+        <button type="button" class="success-dismiss" (click)="signupSuccess = false" aria-label="Dismiss">&times;</button>
       </div>
       
       <form (ngSubmit)="onLogin()" #loginForm="ngForm">
@@ -67,7 +73,7 @@
     </div>
 
     <!-- Signup Card (Right Side) -->
-    <div class="card signup-card hover-lift" *ngIf="activeTab === 'signup'" data-reveal="up">
+    <div class="card signup-card hover-lift glass-card" *ngIf="activeTab === 'signup'" data-reveal="up">
       <div class="card-header">
         <h3>Signup</h3>
         <span class="role-badge">Doctor Account</span>

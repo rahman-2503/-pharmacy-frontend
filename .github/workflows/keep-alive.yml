@@ -1,0 +1,43 @@
+name: Keep-Alive (Render 24/7)
+
+on:
+  schedule:
+    # Every 5 minutes - Render free tier spins down after ~15 min of inactivity.
+    # External pings (from GitHub-hosted runners) keep every service awake.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping all Render services
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 7
+      matrix:
+        service:
+          - name: api-gateway
+            url: https://api-gateway-dbuu.onrender.com/health
+          - name: user-service
+            url: https://user-service-5x8c.onrender.com/health
+          - name: order-service
+            url: https://order-service-irvh.onrender.com/health
+          - name: payment-service
+            url: https://payment-service-6drh.onrender.com/health
+          - name: inventory-service
+            url: https://supplier-inventory-service.onrender.com/health
+          - name: notification-service
+            url: https://notification-service-h2df.onrender.com/health
+          - name: eureka-server
+            url: https://eureka-server-f8h8.onrender.com/health
+          - name: frontend
+            url: https://pharmacy-frontend-0ftx.onrender.com/health
+    steps:
+      - name: Ping ${{ matrix.service.name }}
+        run: |
+          echo "Pinging ${{ matrix.service.name }} ..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 75 "${{ matrix.service.url }}" || echo "000")
+          echo "${{ matrix.service.name }} -> $HTTP_STATUS"
+          if [ "$HTTP_STATUS" = "000" ]; then
+            echo "Warn: ${{ matrix.service.name }} did not respond in time (likely cold start). It will warm up on next ping."
+          fi

@@ -518,3 +518,270 @@ html.reveal-enabled [data-reveal].is-visible {
   }
 }
 
+/* =========================================================
+   DESIGN SYSTEM UPGRADE — glassmorphism, micro-interactions,
+   modal/panel motion, staggered reveals, marquee, shimmer
+   ========================================================= */
+
+:root {
+  --shadow-xl: 0 20px 40px -12px rgba(13, 148, 136, 0.18), 0 8px 16px -6px rgba(2, 132, 199, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --gradient-primary: linear-gradient(135deg, #0d9488, #0284c7);
+  --radius-xl: 28px;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- Glassmorphism --- */
+.glass-card {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(13, 148, 136, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.glass-dark {
+  background: rgba(15, 23, 42, 0.55);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-light);
+}
+
+/* --- Gradient border accent --- */
+.gradient-border { position: relative; }
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: var(--gradient-primary);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* --- Button micro-interactions: shine sweep + press --- */
+.btn { position: relative; overflow: hidden; }
+.btn:active { transform: scale(0.96); }
+.btn-primary::after, .btn-secondary::after, .btn-success::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+.btn-primary:hover::after, .btn-secondary:hover::after, .btn-success:hover::after {
+  left: 130%;
+  transition: left 0.65s var(--ease-out-expo);
+}
+
+/* --- Page / section entry transitions --- */
+.page-transition {
+  animation: pageIn 0.55s var(--ease-out-expo) both;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- Generic entry animations --- */
+.animate-fade-up { animation: fadeUp 0.6s var(--ease-out-expo) both; }
+.animate-slide-down { animation: slideDown 0.5s var(--ease-out-expo) both; }
+.animate-slide-in-right { animation: slideInRight 0.55s var(--ease-out-expo) both; }
+.animate-pop-in { animation: popIn 0.45s var(--ease-out-expo) both; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(26px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(60px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.9); }
+  60%  { transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* --- Modal / panel motion --- */
+.modal-backdrop { animation: overlayFade 0.25s ease both; }
+.modal-card { animation: panelIn 0.4s var(--ease-out-expo) both; }
+.processing-card { animation: panelIn 0.4s var(--ease-out-expo) both; }
+@keyframes overlayFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(28px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- Success banner (login post-signup) --- */
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #047857;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.success-banner .success-icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--success-color);
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.success-banner .success-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #047857;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  transition: var(--transition);
+}
+.success-banner .success-dismiss:hover { transform: scale(1.2); color: var(--danger-color); }
+
+/* --- Drug catalog cards: staggered entry + hover lift + image zoom --- */
+.drug-card {
+  animation: cardIn 0.55s var(--ease-out-expo) both;
+  transition: transform 0.35s var(--ease-out-expo), box-shadow 0.35s var(--ease-out-expo);
+}
+.drug-card:nth-child(1) { animation-delay: 0.04s; }
+.drug-card:nth-child(2) { animation-delay: 0.09s; }
+.drug-card:nth-child(3) { animation-delay: 0.14s; }
+.drug-card:nth-child(4) { animation-delay: 0.19s; }
+.drug-card:nth-child(5) { animation-delay: 0.24s; }
+.drug-card:nth-child(6) { animation-delay: 0.29s; }
+.drug-card:nth-child(7) { animation-delay: 0.34s; }
+.drug-card:nth-child(8) { animation-delay: 0.39s; }
+.drug-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-xl);
+}
+.drug-card img {
+  transition: transform 0.5s var(--ease-out-expo);
+}
+.drug-card:hover img { transform: scale(1.07); }
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- Carousel arrows --- */
+.carousel-arrow {
+  transition: transform 0.25s var(--ease-out-expo), background-color 0.25s, color 0.25s, box-shadow 0.25s;
+}
+.carousel-arrow:hover {
+  transform: scale(1.15);
+  background-color: var(--primary-color) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.35) !important;
+}
+.carousel-arrow:active { transform: scale(0.92); }
+
+/* --- Table rows: soft staggered entrance --- */
+table.pharmacare-table tbody tr {
+  animation: fadeUp 0.45s var(--ease-out-expo) both;
+}
+table.pharmacare-table tbody tr:nth-child(1) { animation-delay: 0.03s; }
+table.pharmacare-table tbody tr:nth-child(2) { animation-delay: 0.07s; }
+table.pharmacare-table tbody tr:nth-child(3) { animation-delay: 0.11s; }
+table.pharmacare-table tbody tr:nth-child(4) { animation-delay: 0.15s; }
+table.pharmacare-table tbody tr:nth-child(5) { animation-delay: 0.19s; }
+table.pharmacare-table tbody tr:nth-child(6) { animation-delay: 0.23s; }
+table.pharmacare-table tbody tr:nth-child(7) { animation-delay: 0.27s; }
+table.pharmacare-table tbody tr:nth-child(8) { animation-delay: 0.31s; }
+table.pharmacare-table tbody tr:nth-child(n + 9) { animation-delay: 0.35s; }
+
+/* --- Analytics cards hover glow --- */
+.analytics-card {
+  transition: transform 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo), border-color 0.3s;
+}
+.analytics-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 30px rgba(13, 148, 136, 0.16);
+  border-color: rgba(13, 148, 136, 0.35);
+}
+
+/* --- Pulsing badge (live status) --- */
+.badge-pulse { animation: badgePulse 2s ease-in-out infinite; }
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+  50%      { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
+}
+
+/* --- Skeleton shimmer (loading placeholders) --- */
+.skeleton {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* --- Sliding logo marquee (home) --- */
+.marquee {
+  overflow: hidden;
+  position: relative;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.marquee-track {
+  display: flex;
+  gap: 56px;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+  padding: 8px 0;
+}
+.marquee:hover .marquee-track { animation-play-state: paused; }
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* --- Inputs: subtle focus glow polish --- */
+input:focus, select:focus, textarea:focus {
+  background-color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition, .animate-fade-up, .animate-slide-down,
+  .animate-slide-in-right, .animate-pop-in, .drug-card,
+  .modal-card, .processing-card, .success-banner,
+  table.pharmacare-table tbody tr, .badge-pulse, .skeleton,
+  .marquee-track, .btn-primary::after, .btn-secondary::after,
+  .btn-success::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+

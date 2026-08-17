@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -37,10 +37,13 @@ export class LoginComponent implements OnInit {
   contactValidationError: string | null = null;
   passwordValidationError: string | null = null;
 
+  signupSuccess = false;
+
   constructor(
     private authService: AuthService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -61,6 +64,13 @@ export class LoginComponent implements OnInit {
       } else {
         this.activeTab = 'signup';
       }
+
+      // Prefill email + show success banner after a fresh signup
+      if (params['email']) {
+        this.loginData.email = params['email'];
+      }
+      this.signupSuccess = params['signedup'] === '1';
+      this.cdr.detectChanges();
     });
   }
 
@@ -197,11 +207,15 @@ export class LoginComponent implements OnInit {
     }).subscribe({
       next: (user) => {
         console.log('Registration successful:', user);
-        alert('Registration successful! Please log in with your credentials.');
-        // Navigate to login view
-        this.setTab('login');
-        this.loginData.email = this.signupData.email;
-        this.loginData.password = '';
+        // Dismiss the signup view and navigate to the Login page with
+        // the email prefilled + a success banner (clean URL navigation).
+        this.router.navigate(['/login'], {
+          queryParams: {
+            tab: 'login',
+            email: this.signupData.email,
+            signedup: '1'
+          }
+        });
       },
       error: (err) => {
         this.signupError = this.extractErrorMessage(err);
