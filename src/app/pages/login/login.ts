@@ -180,6 +180,7 @@ export class LoginComponent implements OnInit {
       },
       error: (err) => {
         this.loginError = this.extractErrorMessage(err);
+        this.cdr.detectChanges();
       }
     });
   }
@@ -219,6 +220,7 @@ export class LoginComponent implements OnInit {
       },
       error: (err) => {
         this.signupError = this.extractErrorMessage(err);
+        this.cdr.detectChanges();
       }
     });
   }
