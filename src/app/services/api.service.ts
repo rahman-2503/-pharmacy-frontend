@@ -175,8 +175,8 @@ export class ApiService {
   }
 
   // --- Drugs API ---
-  private drugsCache$ = new BehaviorSubject<Drug[] | null>(null);
-  private usersCache$ = new BehaviorSubject<User[] | null>(null);
+  private drugsCache$ = new BehaviorSubject<{ ts: number; data: Drug[] } | null>(null);
+  private usersCache$ = new BehaviorSubject<{ ts: number; data: User[] } | null>(null);
 
   private mapBackendDrugsToFrontend(drugs: any[]): Drug[] {
     const defaultImages: { [key: string]: string } = {
@@ -208,10 +208,12 @@ export class ApiService {
   }
 
   public getDrugs(forceRefresh = false): Observable<Drug[]> {
-    // Only short-circuit on a non-empty cache; an empty cache (e.g. a previous
-    // cold-start failure) must NOT block a real refetch.
-    if (this.drugsCache$.value && this.drugsCache$.value.length && !forceRefresh) {
-      return of(this.drugsCache$.value);
+    // Short-circuit ONLY on a very fresh cache (<60s old). This keeps fast
+    // view switches snappy, but never lets a stale list hide drugs that the
+    // admin added moments ago — polling passes forceRefresh=true to bypass.
+    const cached = this.drugsCache$.value;
+    if (cached && cached.data.length && !forceRefresh && Date.now() - cached.ts < 60000) {
+      return of(cached.data);
     }
 
     return this.http.get<any[]>(`${this.baseUrl}/inventory/drug`).pipe(
@@ -223,14 +225,14 @@ export class ApiService {
       map(drugs => {
         const mapped = this.mapBackendDrugsToFrontend(drugs);
         if (mapped.length) {
-          this.drugsCache$.next(mapped);
+          this.drugsCache$.next({ ts: Date.now(), data: mapped });
         }
         return mapped;
       }),
       catchError(err => {
         console.error('Failed to load drugs from backend', err);
-        if (this.drugsCache$.value && this.drugsCache$.value.length) {
-          return of(this.drugsCache$.value);
+        if (cached && cached.data.length) {
+          return of(cached.data);
         }
         return throwError(() => err);
       })
@@ -245,8 +247,9 @@ export class ApiService {
 
   // Get all registered users (doctors + admin) for admin panel & doctor-name mapping
   public getUsers(forceRefresh = false): Observable<User[]> {
-    if (this.usersCache$.value && !forceRefresh) {
-      return of(this.usersCache$.value);
+    const cached = this.usersCache$.value;
+    if (cached && !forceRefresh && Date.now() - cached.ts < 60000) {
+      return of(cached.data);
     }
     return this.http.get<any[]>(`${this.baseUrl}/users`, { headers: this.getHeaders() }).pipe(
       timeout(30000),
@@ -260,12 +263,12 @@ export class ApiService {
           contact: u.contact || u.phone || '',
           role: u.role
         } as User));
-        this.usersCache$.next(mapped);
+        this.usersCache$.next({ ts: Date.now(), data: mapped });
         return mapped;
       }),
       catchError(err => {
         console.error('Failed to load users from backend', err);
-        return this.usersCache$.value ? of(this.usersCache$.value) : of([]);
+        return cached ? of(cached.data) : of([]);
       })
     );
   }
@@ -306,7 +309,7 @@ export class ApiService {
           supplierEmail: d.supplierEmail || ''
         };
         if (this.drugsCache$.value) {
-          this.drugsCache$.next([...this.drugsCache$.value, mapped]);
+          this.drugsCache$.next({ ts: Date.now(), data: [...this.drugsCache$.value.data, mapped] });
         }
         return mapped;
       })
@@ -338,10 +341,10 @@ export class ApiService {
           supplierEmail: d.supplierEmail || ''
         };
         if (this.drugsCache$.value) {
-          const updatedList = this.drugsCache$.value.map(item =>
+          const updatedList = this.drugsCache$.value.data.map(item =>
             (item.id === id || item.drugId === id) ? mapped : item
           );
-          this.drugsCache$.next(updatedList);
+          this.drugsCache$.next({ ts: Date.now(), data: updatedList });
         }
         return mapped;
       })

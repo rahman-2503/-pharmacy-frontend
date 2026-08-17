@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { Drug, Supplier, Order, SalesReport, Notification, User } from '../../models';
-import { forkJoin, Subject } from 'rxjs';
+import { Subject } from 'rxjs';
 import { takeUntil, finalize } from 'rxjs/operators';
 import Chart from 'chart.js/auto';
 
@@ -122,7 +122,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         },
         error: () => { /* keep last known data; next tick will retry */ }
       });
-      this.apiService.getDrugs().subscribe({
+      this.apiService.getDrugs(true).subscribe({
         next: (data) => {
           this.drugs = data;
           if (this.drugSearchQuery) this.applyDrugSearch();
@@ -151,19 +151,22 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.loadAllData();
   }
 
+  // Cache is ONLY an instant placeholder so the UI never shows a blank
+  // screen while fresh data loads. It must NEVER set dataLoaded — otherwise
+  // a stale (or empty) cache from a previous session would make loadAllData
+  // return early and the dashboard would show old/nothing forever.
   private restoreFromCache() {
     try {
       const raw = localStorage.getItem(this.CACHE_KEY);
-      if (raw) {
-        const c = JSON.parse(raw);
-        this.drugs = c.drugs || [];
-        this.filteredDrugs = [...this.drugs];
-        this.suppliers = c.suppliers || [];
-        this.orders = c.orders || [];
-        this.salesReports = c.salesReports || [];
-        this.calculateSalesAggregates();
-        this.dataLoaded = true;
-      }
+      if (!raw) return;
+      const c = JSON.parse(raw);
+      if (c.ts && Date.now() - c.ts > 5 * 60 * 1000) return; // stale cache → ignore
+      this.drugs = c.drugs || [];
+      this.filteredDrugs = [...this.drugs];
+      this.suppliers = c.suppliers || [];
+      this.orders = c.orders || [];
+      this.salesReports = c.salesReports || [];
+      this.calculateSalesAggregates();
     } catch { /* ignore cache errors */ }
   }
 
@@ -189,9 +192,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   // Load all registered users (doctors + admin) and build a userId -> name map
-  loadUsers() {
+  loadUsers(forceRefresh = false) {
     this.loadingUsers = true;
-    this.apiService.getUsers().pipe(takeUntil(this.destroy$)).subscribe({
+    this.apiService.getUsers(forceRefresh).pipe(takeUntil(this.destroy$)).subscribe({
       next: (users) => {
         this.allUsers = users.filter(u => u.role !== 'ADMIN');
         this.doctorNameMap = {};
@@ -211,52 +214,75 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Load the four data legs INDEPENDENTLY so one failing endpoint (e.g. a
+  // service still waking up) can never blank the whole dashboard.
   loadAllData() {
     if (this.dataLoaded) return;
     this.loading = true;
     this.loadError = false;
-    forkJoin([
-      this.apiService.getDrugs(),
-      this.apiService.getSuppliers(),
-      this.apiService.getOrders(),
-      this.apiService.getSalesReports()
-    ]).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ([drugs, suppliers, orders, reports]) => {
+
+    this.apiService.getDrugs().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (drugs) => {
         this.drugs = drugs;
         this.filteredDrugs = [...drugs];
+        if (this.drugSearchQuery) this.applyDrugSearch();
+        this.loading = false;
+        this.loadError = false;
+        this.persistCache();
+        this.cd();
+      },
+      error: (err) => {
+        console.error('Failed to load drugs', err);
+        this.loading = false;
+        if (this.drugs.length === 0) this.loadError = true;
+        this.cd();
+      }
+    });
+
+    this.apiService.getSuppliers().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (suppliers) => {
         this.suppliers = suppliers;
         this.supplierMapAdmin = {};
         suppliers.forEach(s => {
           const key = (s.email || s.contact || '').toString();
           if (key) this.supplierMapAdmin[key] = s.name;
         });
-        this.orders = orders.map(o => this.apiService.joinOrderWithDrug(o, drugs, this.doctorNameMap));
+        this.cd();
+      },
+      error: (err) => console.error('Failed to load suppliers', err)
+    });
 
+    this.apiService.getOrders().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (orders) => {
+        this.orders = orders.map(o => this.apiService.joinOrderWithDrug(o, this.drugs, this.doctorNameMap));
         const emails = new Set<string>();
         orders.forEach(o => {
           if (o.doctorEmail) emails.add(o.doctorEmail);
         });
         this.doctors = Array.from(emails);
-
-        this.salesReports = reports;
-        this.calculateSalesAggregates();
-        this.loading = false;
         this.dataLoaded = true;
+        this.loadError = false;
         this.persistCache();
-
         if (this.currentSection === 'analytics') {
-          setTimeout(() => {
-            this.initCharts();
-          }, 100);
+          setTimeout(() => this.initCharts(), 100);
         }
         this.cd();
       },
       error: (err) => {
-        console.error('Failed to load admin dashboard data', err);
-        this.loading = false;
-        this.loadError = true;
+        console.error('Failed to load orders', err);
+        this.loadError = this.orders.length === 0;
         this.cd();
       }
+    });
+
+    this.apiService.getSalesReports().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (reports) => {
+        this.salesReports = reports;
+        this.calculateSalesAggregates();
+        this.persistCache();
+        this.cd();
+      },
+      error: (err) => console.error('Failed to load sales reports', err)
     });
   }
 
@@ -623,7 +649,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (confirm('Are you sure you want to block this user?')) {
       this.apiService.toggleUserStatus(id).subscribe({
         next: () => {
-          this.loadUsers();
+          this.loadUsers(true);
           this.showMessage('User blocked successfully.', 'success');
           this.cd();
         },
@@ -640,7 +666,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (confirm('Are you sure you want to unblock this user?')) {
       this.apiService.toggleUserStatus(id).subscribe({
         next: () => {
-          this.loadUsers();
+          this.loadUsers(true);
           this.showMessage('User unblocked successfully.', 'success');
           this.cd();
         },
@@ -657,7 +683,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (confirm('Are you sure you want to permanently delete this user?')) {
       this.apiService.deleteUser(id).subscribe({
         next: () => {
-          this.loadUsers();
+          this.loadUsers(true);
           this.showMessage('User deleted successfully.', 'success');
           this.cd();
         },

@@ -144,7 +144,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
   }
 
   private refreshDrugsSilently() {
-    this.apiService.getDrugs().pipe(takeUntil(this.destroy$)).subscribe({
+    this.apiService.getDrugs(true).pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => {
         this.drugs = data;
         this.filteredDrugs = [...data];
@@ -228,24 +228,26 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Cache is ONLY an instant placeholder while fresh data loads. It must
+  // NEVER set the drugsLoaded/ordersLoaded flags — those flags gate the
+  // initial fetch, so a stale cache would make loadDrugs()/loadOrders()
+  // return early and the doctor would see old/empty data forever.
   private restoreFromCache() {
     try {
       const raw = localStorage.getItem(this.CACHE_KEY);
-      if (raw) {
-        const c = JSON.parse(raw);
-        if (c.drugs && c.drugs.length) {
-          this.drugs = c.drugs;
-          this.filteredDrugs = [...c.drugs];
-          this.drugsLoaded = true;
-          this.drugs.forEach(d => {
-            const key = d.id! || d.drugId!;
-            this.quantitiesMap[key] = 1;
-          });
-        }
-        if (c.orders && c.orders.length) {
-          this.orders = c.orders;
-          this.ordersLoaded = true;
-        }
+      if (!raw) return;
+      const c = JSON.parse(raw);
+      if (c.ts && Date.now() - c.ts > 5 * 60 * 1000) return; // stale cache → ignore
+      if (c.drugs && c.drugs.length) {
+        this.drugs = c.drugs;
+        this.filteredDrugs = [...c.drugs];
+        this.drugs.forEach(d => {
+          const key = d.id! || d.drugId!;
+          this.quantitiesMap[key] = 1;
+        });
+      }
+      if (c.orders && c.orders.length) {
+        this.orders = c.orders;
       }
     } catch { /* ignore */ }
   }
@@ -273,6 +275,14 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
       setTimeout(() => {
         this.initCharts();
       }, 150);
+    }
+    // Refresh the catalogue + order history every time the user opens them,
+    // so admin-side changes are always visible immediately.
+    if (section === 'view-drugs' || section === 'order-drugs') {
+      this.refreshDrugsSilently();
+    }
+    if (section === 'order-history') {
+      this.refreshOrdersSilently();
     }
   }
 
