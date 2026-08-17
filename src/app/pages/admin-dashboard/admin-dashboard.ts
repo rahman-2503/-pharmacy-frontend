@@ -126,6 +126,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         next: (data) => {
           this.drugs = data;
           if (this.drugSearchQuery) this.applyDrugSearch();
+          this.rejoinOrders();
           this.cd();
         },
         error: () => { /* keep last known data */ }
@@ -191,6 +192,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+    // Re-join order rows with the CURRENT drugs + doctor names. Orders and
+  // drugs load on independent legs (and can resolve out of order), so every
+  // drugs update re-enriches any already-rendered order rows.
+  private rejoinOrders() {
+    this.orders = this.orders.map(o => this.apiService.joinOrderWithDrug(o, this.drugs, this.doctorNameMap));
+    this.cd();
+  }
+
   // Load all registered users (doctors + admin) and build a userId -> name map
   loadUsers(forceRefresh = false) {
     this.loadingUsers = true;
@@ -226,6 +235,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         this.drugs = drugs;
         this.filteredDrugs = [...drugs];
         if (this.drugSearchQuery) this.applyDrugSearch();
+        this.rejoinOrders();
         this.loading = false;
         this.loadError = false;
         this.persistCache();

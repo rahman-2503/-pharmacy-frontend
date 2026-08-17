@@ -126,6 +126,14 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
     this.startAutoRefresh();
   }
 
+    // Re-join order rows with the CURRENT drugs list. Orders and drugs load on
+  // independent legs and can resolve out of order, so every drugs update
+  // re-enriches any already-rendered order rows (name, price, total).
+  private rejoinOrders() {
+    this.orders = this.orders.map(o => this.apiService.joinOrderWithDrug(o, this.drugs));
+    this.cd();
+  }
+
   // Real-time sync: silently refresh drugs + orders so drugs added by the
   // admin appear (and order status changes show up) without a page reload.
   private startAutoRefresh() {
@@ -157,6 +165,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
         }
         this.loadingDrugs = false;
         this.drugsLoadError = false;
+        this.rejoinOrders();
         this.persistCache();
         this.cd();
       },
@@ -432,6 +441,7 @@ export class DoctorDashboardComponent implements OnInit, OnDestroy {
           this.drugsLoaded = true;
         }
         this.loadingDrugs = false;
+        this.rejoinOrders();
         this.cd();
       },
       error: (err) => {
